@@ -648,7 +648,7 @@ def schedule_secret(cfg, journal, *, apply=False):
             journal.saved['secret_deletion_intent'] = result
             journal.save()
             oci(cfg, 'vault', 'secret', 'schedule-secret-deletion', '--secret-id', secret_id,
-                '--time-of-deletion', deadline)
+                '--time-of-deletion', deadline, expect_data=False)
             secret = oci(cfg, 'vault', 'secret', 'get', '--secret-id', secret_id)
             if secret.get('lifecycle-state') != 'PENDING_DELETION':
                 raise PocError('Inference-secret deletion is not yet confirmed; rerun to resume.')

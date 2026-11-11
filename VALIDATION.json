@@ -395,5 +395,31 @@
       "Service-managed storage and retention/backups still require final service-side checks."
     ],
     "cloud_mutations_executed_by_assistant": false
+  },
+  "empty_secret_response_fix": {
+    "verified_utc": "2026-11-11T22:05:28.824500+00:00",
+    "status": "PASS",
+    "controller_tests_passed": 136,
+    "cause": "Successful OCI secret deletion scheduling can return an empty CLI response. The shared helper unconditionally indexed data after the request succeeded.",
+    "change": "Explicitly allow a response without data only for secret deletion scheduling, then require a metadata GET to confirm PENDING_DELETION. Read commands retain the required data-envelope check.",
+    "checks": [
+      "Empty successful scheduling response followed by Pending metadata is accepted.",
+      "An empty response followed by Active metadata still stops cleanup.",
+      "Read operations with missing data remain failures.",
+      "Live metadata-only resume check preserved the existing pending deadline without issuing another scheduling request.",
+      "Future handover builds match the corrected source.",
+      "Release integrity verified."
+    ],
+    "live_read_only_resume_check": {
+      "status": "PASS",
+      "live_secret_metadata_gets": 1,
+      "cloud_mutations": 0,
+      "pending_deadline_preserved": true,
+      "secret_contents_retrieved": false
+    },
+    "limitations": [
+      "The full destructive infrastructure sequence remains an operator-run acceptance check."
+    ],
+    "cloud_mutations_executed_by_assistant": false
   }
 }

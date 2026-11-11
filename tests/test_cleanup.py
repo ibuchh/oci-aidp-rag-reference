@@ -494,6 +494,32 @@ class CleanupTests(unittest.TestCase):
             self.assertEqual(cloud.call_args_list[1].args[1:4],('vault','secret','schedule-secret-deletion'))
             self.assertEqual(result['state'],'PENDING_DELETION')
 
+    def test_secret_schedule_accepts_empty_cli_response_then_checks_metadata(self):
+        secret=self.secret();controller=self.controller();controller.saved['runtime_precleanup_verified']=True
+        self.cfg['oci_profile']='fixture'
+        pending=dict(secret,**{'lifecycle-state':'PENDING_DELETION','time-of-deletion':'deadline'})
+        with mock.patch.object(poc,'capture',side_effect=[{'data':secret},{},{'data':pending}]) as command:
+            result=cleanup.schedule_secret(self.cfg,controller,apply=True)
+        self.assertEqual(result['state'],'PENDING_DELETION')
+        self.assertEqual(controller.saved['secret']['time_of_deletion'],'deadline')
+        self.assertIn('schedule-secret-deletion',command.call_args_list[1].args[0])
+        self.assertIn('get',command.call_args_list[2].args[0])
+
+    def test_empty_schedule_response_is_not_accepted_without_pending_metadata(self):
+        secret=self.secret();controller=self.controller();controller.saved['runtime_precleanup_verified']=True
+        self.cfg['oci_profile']='fixture'
+        with mock.patch.object(poc,'capture',side_effect=[{'data':secret},{},{'data':secret}]):
+            with self.assertRaisesRegex(poc.PocError,'deletion is not yet confirmed'):
+                cleanup.schedule_secret(self.cfg,controller,apply=True)
+        self.assertNotIn('secret',controller.saved)
+        self.assertIn('secret_deletion_intent',controller.saved)
+
+    def test_oci_reads_still_reject_a_missing_data_envelope(self):
+        self.cfg['oci_profile']='fixture'
+        with mock.patch.object(poc,'capture',return_value={}):
+            with self.assertRaisesRegex(poc.PocError,'required data envelope'):
+                poc.oci(self.cfg,'vault','secret','get','--secret-id','fixture')
+
     def test_pending_secret_deadline_is_preserved_and_foreign_vault_blocks(self):
         secret=self.secret();controller=self.controller();controller.saved['runtime_verified']=True
         secret.update({'lifecycle-state':'PENDING_DELETION','time-of-deletion':'original-deadline'})
@@ -566,7 +592,7 @@ class CleanupTests(unittest.TestCase):
         def request(method,*args,**kwargs):
             if method!='GET':events.append('runtime')
             return original(method,*args,**kwargs)
-        def cloud(cfg,*args):
+        def cloud(cfg,*args,**kwargs):
             if args[2]=='schedule-secret-deletion':
                 self.assertTrue(controller.saved['runtime_verified'])
                 events.append('secret');secret['lifecycle-state']='PENDING_DELETION';return {}

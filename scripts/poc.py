@@ -81,9 +81,12 @@ def capture(argv, *, data=None):
     return json.loads(result.stdout) if result.stdout.strip() else {}
 
 
-def oci(cfg, *args, home=False):
-    return capture(['oci', '--profile', cfg['oci_profile'], '--region',
-                    cfg['home_region'] if home else cfg['region'], *args])['data']
+def oci(cfg, *args, home=False, expect_data=True):
+    response = capture(['oci', '--profile', cfg['oci_profile'], '--region',
+                        cfg['home_region'] if home else cfg['region'], *args])
+    if not isinstance(response, dict) or (expect_data and 'data' not in response):
+        raise PocError('OCI CLI response is missing the required data envelope.')
+    return response.get('data')
 
 
 def target_check(cfg):

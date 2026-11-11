@@ -21,7 +21,11 @@ from urllib.parse import quote, urlencode
 from uuid import uuid4
 
 from aidp_workspace import Api, ApiError
-from poc import ROOT, PocError, oci, output, private_json
+from poc import ROOT, PocError, managed, oci, output, private_json, state
+
+
+VECTOR_WORKSPACE_RESTRICTION = ('Deletion of workspace associated with Vector Database is not allowed. '
+                                'It can only be deleted as part of AI Data Platform deletion.')
 
 
 def utc():
@@ -38,6 +42,24 @@ def load(path):
     if path.is_symlink():
         raise PocError('Cleanup inventories must be regular files.')
     return json.loads(path.read_text()) if path.is_file() else {}
+
+
+def empty_stage_state(cfg, stage):
+    path = Path(cfg['state_directory'])/stage/'terraform.tfstate'
+    if path.is_symlink() or not path.is_file():
+        return False
+    snapshot = state(path)
+    return (snapshot.get('version') in (3, 4) and isinstance(snapshot.get('resources'), list)
+            and isinstance(snapshot.get('outputs'), dict) and not managed(snapshot) and not snapshot['outputs'])
+
+
+def remaining_output(cfg, stage):
+    try:
+        return output(cfg, stage)
+    except PocError:
+        if empty_stage_state(cfg, stage):
+            return {}
+        raise
 
 
 @contextlib.contextmanager
@@ -112,7 +134,6 @@ class RuntimeCleanup:
         self.saved = load(self.path)
         self.baseline = load(self.folder/'aidp-workspace.json')
         self.rag = load(self.folder/'rag'/'inventory.json')
-        self.aidp_id = output(cfg, 'aidp').get('aidp_id')
         self.target = {k: cfg[k] for k in ('name', 'tenancy_id', 'compartment_id', 'region')}
         self.additional = set(additional_workspaces)
         for value in self.additional:
@@ -123,9 +144,16 @@ class RuntimeCleanup:
         self.pending = []
         self.api = api
         self.operations, self.blockers = [], []
+        self.deferred_workspaces = []
+        self.aidp_id = remaining_output(cfg, 'aidp').get('aidp_id')
         if not self.aidp_id:
-            if (self.baseline or self.rag) and not self.saved.get('runtime_verified'):
-                raise PocError('AIDP state/output is missing but runtime inventory exists. Reconcile before cleanup.')
+            previous = self.saved.get('aidp_id')
+            if self.baseline or self.rag:
+                if not previous or self.baseline.get('aidp_id') != previous or not empty_stage_state(cfg, 'aidp'):
+                    raise PocError('AIDP state/output is missing but runtime inventory exists. Reconcile before cleanup.')
+                if self.rag and self.rag.get('aidp_id') != previous:
+                    raise PocError('RAG inventory belongs to another AIDP instance.')
+                self.verify_parent_deleted(previous)
             if self.additional and not self.saved.get('runtime_verified'):
                 raise PocError('Additional workspaces require a recorded AIDP instance.')
             return
@@ -210,6 +238,7 @@ class RuntimeCleanup:
 
     def preview(self):
         self.operations, self.blockers = [], []
+        self.deferred_workspaces = []
         self.pending = []
         if not self.aidp_id:
             return self.report()
@@ -231,7 +260,7 @@ class RuntimeCleanup:
         missing_approval = approved-workspace_keys
         completed = self.saved.get('operations', {})
         for value in missing_approval:
-            if completed.get('/workspaces/'+key(value), {}).get('status') != 'DONE':
+            if completed.get('/workspaces/'+key(value), {}).get('status') not in ('DONE', 'REMOVED_WITH_PARENT'):
                 self.blockers.append('Additional workspace is absent or not visible: '+value)
         for item in workspaces:
             if item['key'] == self.workspace['key']:
@@ -245,8 +274,17 @@ class RuntimeCleanup:
                 self.blockers.append('Untracked workspace '+item.get('displayName', '?')+' ['+item['key']+
                                      ']; review it and explicitly select --additional-workspace '+item['key'])
             else:
-                self.add('workspace', '/workspaces/'+key(item['key']), '/workspaces', item['key'],
-                         item.get('displayName', item['key']), explicit_selection=True)
+                path = '/workspaces/'+key(item['key'])
+                record = completed.get(path, {})
+                if record.get('status') == 'DEFERRED_TO_PARENT':
+                    if (record.get('parent_aidp_id') != self.aidp_id or record.get('name') != item.get('displayName')
+                            or record.get('reason') != VECTOR_WORKSPACE_RESTRICTION or not record.get('request_id')):
+                        raise PocError('Deferred workspace identity/reason changed; reconcile before cleanup.')
+                    self.deferred_workspaces.append({'key': item['key'], 'name': item['displayName'],
+                                                     'parent_aidp_id': self.aidp_id})
+                else:
+                    self.add('workspace', path, '/workspaces', item['key'],
+                             item.get('displayName', item['key']), explicit_selection=True)
         extras = self.operations
         self.operations = []
         agents = []
@@ -356,6 +394,7 @@ class RuntimeCleanup:
     def report(self):
         result = {'target': self.target, 'aidp_id': self.aidp_id,
                   'operations': self.operations, 'blockers': self.blockers,
+                  'deferred_workspaces': self.deferred_workspaces,
                   'pending_async_operations': self.pending,
                   'remote_data_exported': False, 'generated_utc': utc()}
         private_json(self.folder/'cleanup'/'preview.json', result)
@@ -366,6 +405,8 @@ class RuntimeCleanup:
                   (' — ALL workspace contents (explicit selection)' if op.get('explicit_selection') else ''), flush=True)
         for blocker in self.blockers:
             print('  BLOCKED: '+blocker, flush=True)
+        for workspace in self.deferred_workspaces:
+            print('  Deferred to AIDP deletion: workspace '+workspace['name']+' ['+workspace['key']+']', flush=True)
         print('Local backup: config, source, state and inventories. Remote data is not exported.', flush=True)
         return result
 
@@ -409,6 +450,7 @@ class RuntimeCleanup:
         if not self.aidp_id:
             return
         self.saved['runtime_verified'] = False
+        self.saved['runtime_precleanup_verified'] = False
         self.saved['approved_workspaces'] = sorted(self.additional | set(self.saved.get('approved_workspaces', [])))
         self.save()
         # A resource may disappear before its asynchronous cleanup finishes.
@@ -463,7 +505,20 @@ class RuntimeCleanup:
                     headers['path'] = op['file_path']
                 record.update(status='INTENT', updated_utc=utc())
                 self.save()
-                _, response = self.request('DELETE', op['path'], headers=headers)
+                try:
+                    _, response = self.request('DELETE', op['path'], headers=headers)
+                except ApiError as error:
+                    if (op['kind'] != 'workspace' or not op.get('explicit_selection')
+                            or op['key'] not in self.saved['approved_workspaces'] or error.status != 403
+                            or error.code != 'NotAllowed' or error.service_message != VECTOR_WORKSPACE_RESTRICTION):
+                        raise
+                    # This exact service restriction establishes the parent-deletion
+                    # dependency. Other authorization failures always remain fatal.
+                    record.update(status='DEFERRED_TO_PARENT', name=op['name'], parent_aidp_id=self.aidp_id,
+                                  reason=error.service_message, request_id=error.request_id, updated_utc=utc())
+                    self.save()
+                    print('Deferred to AIDP deletion: workspace '+op['name']+' (Vector Database association)', flush=True)
+                    continue
                 record.update(status='REQUESTED', async_operation_key=response.get('aidp-async-operation-key'),
                               request_id=response.get('opc-request-id'), updated_utc=utc())
                 self.save()
@@ -476,10 +531,46 @@ class RuntimeCleanup:
         if report['blockers'] or report['operations'] or report['pending_async_operations']:
             raise PocError('Runtime cleanup is incomplete or resources changed. Infrastructure was preserved.')
         for record in self.saved.get('operations', {}).values():
-            record['status'] = 'DONE'
-        self.saved['runtime_verified'] = True
-        self.saved['runtime_verified_utc'] = utc()
+            if record.get('status') != 'DEFERRED_TO_PARENT':
+                record['status'] = 'DONE'
+        self.saved['runtime_precleanup_verified'] = True
+        self.saved['runtime_verified'] = not self.deferred_workspaces
+        if self.saved['runtime_verified']:
+            self.saved['runtime_verified_utc'] = utc()
         self.save()
+
+    def verify_parent_deleted(self, aidp_id):
+        """Close deferred work only after Terraform and the control plane agree."""
+        if aidp_id != self.saved.get('aidp_id') or aidp_id != self.baseline.get('aidp_id'):
+            raise PocError('Parent deletion target does not match the cleanup ownership records.')
+        if not empty_stage_state(self.cfg, 'aidp'):
+            raise PocError('AIDP Terraform state is not empty; parent deletion is not verified.')
+        deadline, last = time.monotonic()+self.wait_seconds, 0
+        while True:
+            listing = oci(self.cfg, 'ai-data-platform', 'ai-data-platform-collection', 'list-ai-data-platforms',
+                          '--compartment-id', self.cfg['compartment_id'], '--all')
+            items = listing.get('items') if isinstance(listing, dict) else listing
+            if not isinstance(items, list) or any(not isinstance(i, dict) or not i.get('id') for i in items):
+                raise PocError('Invalid AIDP control-plane listing; parent deletion is not verified.')
+            found = [i for i in items if i['id'] == aidp_id]
+            if not found or all(i.get('lifecycle-state') == 'DELETED' for i in found):
+                break
+            if any(i.get('lifecycle-state') != 'DELETING' for i in found) or time.monotonic() >= deadline:
+                raise PocError('AIDP deletion is not verified by the control plane. Keep the journal and rerun to resume.')
+            if time.monotonic()-last >= 30:
+                print('Waiting for parent AIDP deletion verification...', flush=True)
+                last = time.monotonic()
+            time.sleep(5)
+        for record in self.saved.get('operations', {}).values():
+            if record.get('status') == 'DEFERRED_TO_PARENT':
+                if record.get('parent_aidp_id') != aidp_id:
+                    raise PocError('Deferred workspace belongs to a different AIDP instance.')
+                record.update(status='REMOVED_WITH_PARENT', updated_utc=utc())
+        self.saved.update(runtime_verified=True, runtime_precleanup_verified=True, runtime_verified_utc=utc(),
+                          parent_deletion_verified={'aidp_id': aidp_id, 'verified_utc': utc(),
+                              'evidence': 'Empty Terraform state and successful control-plane compartment listing'})
+        self.save()
+        print('Parent AIDP deletion verified; associated deferred workspaces were removed with it.', flush=True)
 
     def detach_playground(self, op, current, record):
         """Use the Console's detach action; a null computeKey update is ignored.
@@ -538,7 +629,7 @@ def schedule_secret(cfg, journal, *, apply=False):
     secret = oci(cfg, 'vault', 'secret', 'get', '--secret-id', secret_id)
     if secret.get('compartment-id') != cfg['compartment_id']:
         raise PocError('Recorded inference secret belongs to another compartment.')
-    vault = output(cfg, 'aidp-foundation').get('vault_id') or record.get('vault_id')
+    vault = remaining_output(cfg, 'aidp-foundation').get('vault_id') or record.get('vault_id')
     expected_name = cfg['name']+'-inference-api-key'
     if (not vault or secret.get('vault-id') != vault or record.get('vault_id') != vault or
             record.get('name') != expected_name or secret.get('secret-name') != expected_name):
@@ -552,7 +643,7 @@ def schedule_secret(cfg, journal, *, apply=False):
         result['proposed_time_of_deletion'] = deadline
         print('Inference secret: schedule deletion after runtime cleanup (8-day retention).', flush=True)
         if apply:
-            if not journal.saved.get('runtime_verified'):
+            if not (journal.saved.get('runtime_verified') or journal.saved.get('runtime_precleanup_verified')):
                 raise PocError('Secret scheduling requires verified runtime cleanup.')
             journal.saved['secret_deletion_intent'] = result
             journal.save()
@@ -596,7 +687,12 @@ def automated_destroy(cfg, args, *, preview_infrastructure, apply_infrastructure
             cleanup.saved['runtime_verified'] = True
             cleanup.save()
         schedule_secret(cfg, cleanup, apply=True)
-        apply_infrastructure()
+        if any(r.get('status') == 'DEFERRED_TO_PARENT' for r in cleanup.saved.get('operations', {}).values()):
+            apply_infrastructure(after_aidp=lambda: cleanup.verify_parent_deleted(cleanup.saved['aidp_id']))
+            if not cleanup.saved.get('runtime_verified') or not cleanup.saved.get('parent_deletion_verified'):
+                raise PocError('Deferred workspace removal was not verified; cleanup cannot be marked complete.')
+        else:
+            apply_infrastructure()
         cleanup.saved.update(infrastructure_completed=True, infrastructure_completed_utc=utc())
         cleanup.save()
         print('Automated cleanup completed. Check pending Vault retention and retained service backups separately.', flush=True)

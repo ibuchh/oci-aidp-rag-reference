@@ -226,6 +226,148 @@ class CleanupTests(unittest.TestCase):
         self.assertEqual(controller.saved['operations']['/workspaces/extra']['status'], 'INTENT')
         self.assertNotIn('secret', controller.saved)
 
+    def vector_workspace_controller(self):
+        self.api.resources['/workspaces/vector'] = {'key':'vector','displayName':'fixture-vector','type':'USER'}
+        request = self.api.request
+        def restricted(method, path, body=None, **kwargs):
+            if method == 'DELETE' and path == '/workspaces/vector':
+                self.api.calls.append((method,path,body,kwargs))
+                raise ApiError(403, 'NotAllowed', 'vector-request', cleanup.VECTOR_WORKSPACE_RESTRICTION)
+            return request(method,path,body,**kwargs)
+        self.api.request = restricted
+        controller = self.controller(additional_workspaces=['vector']); controller.preview(); controller.execute()
+        return controller
+
+    def test_vector_workspace_is_deferred_without_claiming_runtime_removed(self):
+        controller = self.vector_workspace_controller()
+        self.assertIn('/workspaces/vector',self.api.resources)
+        self.assertEqual(controller.saved['operations']['/workspaces/vector']['status'],'DEFERRED_TO_PARENT')
+        self.assertTrue(controller.saved['runtime_precleanup_verified'])
+        self.assertFalse(controller.saved['runtime_verified'])
+        report=controller.preview()
+        self.assertFalse(report['operations']); self.assertFalse(report['blockers'])
+        self.assertEqual(report['deferred_workspaces'][0]['key'],'vector')
+        controller=self.controller(additional_workspaces=['vector']); controller.preview(); controller.execute()
+        self.assertEqual(sum(m=='DELETE' and p=='/workspaces/vector' for m,p,_,_ in self.api.calls),1)
+        self.assertFalse(controller.saved['runtime_verified'])
+
+    def test_vector_deferral_requires_exact_service_reason_and_explicit_selection(self):
+        request=self.api.request
+        def restricted(method,path,body=None,**kwargs):
+            if method=='DELETE' and path=='/workspaces/ws':
+                raise ApiError(403,'NotAllowed','request',cleanup.VECTOR_WORKSPACE_RESTRICTION)
+            return request(method,path,body,**kwargs)
+        self.api.request=restricted
+        controller=self.controller();controller.preview()
+        with self.assertRaises(ApiError):controller.execute()
+        self.assertEqual(controller.saved['operations']['/workspaces/ws']['status'],'INTENT')
+        self.assertFalse(controller.saved['runtime_precleanup_verified'])
+
+    def test_deferred_workspace_identity_change_blocks_preview(self):
+        controller=self.vector_workspace_controller()
+        self.api.resources['/workspaces/vector']['displayName']='changed'
+        with self.assertRaisesRegex(poc.PocError,'identity/reason changed'):
+            self.controller(additional_workspaces=['vector']).preview()
+
+    def test_parent_verification_requires_empty_state_and_live_absence(self):
+        controller=self.vector_workspace_controller()
+        with mock.patch.object(cleanup,'oci',return_value={'items':[]}) as cloud:
+            with self.assertRaisesRegex(poc.PocError,'Terraform state is not empty'):
+                controller.verify_parent_deleted(FakeApi.aidp_id)
+            cloud.assert_not_called()
+        self.write(self.folder/'states/aidp/terraform.tfstate',{'version':4,'resources':[],'outputs':{}})
+        with mock.patch.object(cleanup,'oci',return_value={'items':[{'id':FakeApi.aidp_id,'lifecycle-state':'ACTIVE'}]}):
+            with self.assertRaisesRegex(poc.PocError,'control plane'):
+                controller.verify_parent_deleted(FakeApi.aidp_id)
+        self.assertFalse(controller.saved['runtime_verified'])
+        with mock.patch.object(cleanup,'oci',return_value={'items':[]}):
+            controller.verify_parent_deleted(FakeApi.aidp_id)
+        self.assertTrue(controller.saved['runtime_verified'])
+        self.assertEqual(controller.saved['operations']['/workspaces/vector']['status'],'REMOVED_WITH_PARENT')
+
+    def test_parent_verification_rejects_bad_listing_and_auth_failure(self):
+        controller=self.vector_workspace_controller()
+        self.write(self.folder/'states/aidp/terraform.tfstate',{'version':4,'resources':[],'outputs':{}})
+        for response in [{}, {'items':[{}]}]:
+            with mock.patch.object(cleanup,'oci',return_value=response),self.assertRaises(poc.PocError):
+                controller.verify_parent_deleted(FakeApi.aidp_id)
+        with mock.patch.object(cleanup,'oci',side_effect=poc.PocError('authorization denied')):
+            with self.assertRaises(poc.PocError):controller.verify_parent_deleted(FakeApi.aidp_id)
+        self.assertFalse(controller.saved['runtime_verified'])
+
+    def test_vector_pipeline_defers_workspace_then_verifies_parent_after_infrastructure(self):
+        controller=self.vector_workspace_controller();events=[]
+        args=argparse.Namespace(additional_workspace=['vector'],cleanup_wait_minutes=1,apply=True,yes=True,
+            config=Path('config.json'),delete_data=True,confirm_name='fixture-poc')
+        def secret(cfg,journal,apply=False):
+            if apply:
+                self.assertTrue(journal.saved['runtime_precleanup_verified'])
+                self.assertFalse(journal.saved['runtime_verified']);events.append('secret')
+        def infrastructure(after_aidp=None):
+            events.append('infrastructure')
+            self.assertFalse(controller.saved['runtime_verified'])
+            self.write(self.folder/'states/aidp/terraform.tfstate',{'version':4,'resources':[],'outputs':{}})
+            after_aidp()
+        def cloud(*args):events.append('parent-verify');return {'items':[]}
+        with mock.patch.object(cleanup,'RuntimeCleanup',return_value=controller), \
+             mock.patch.object(cleanup,'schedule_secret',side_effect=secret), \
+             mock.patch.object(cleanup,'backup_local',return_value={'archive':'fixture'}), \
+             mock.patch.object(cleanup,'oci',side_effect=cloud):
+            cleanup.automated_destroy(self.cfg,args,preview_infrastructure=lambda:None,apply_infrastructure=infrastructure)
+        self.assertEqual(events,['secret','infrastructure','parent-verify'])
+        self.assertTrue(controller.saved['runtime_verified']);self.assertTrue(controller.saved['infrastructure_completed'])
+
+    def test_infrastructure_parent_check_runs_before_lakehouse_and_iam_removal(self):
+        events=[]
+        with mock.patch.object(poc,'managed',return_value=True), \
+             mock.patch.object(poc,'state',return_value={}), \
+             mock.patch.object(poc,'tf_stage',side_effect=lambda cfg,stage,**kwargs:events.append(stage)), \
+             mock.patch.object(poc,'inference',side_effect=lambda *args,**kwargs:events.append('inference')):
+            poc.destroy_infrastructure(self.cfg,argparse.Namespace(yes=True),apply=True,
+                after_aidp=lambda:events.append('verify-parent'))
+        self.assertEqual(events.index('verify-parent'),events.index('aidp')+1)
+        self.assertLess(events.index('verify-parent'),events.index('lakehouse'))
+        self.assertLess(events.index('verify-parent'),events.index('iam'))
+
+    def test_secret_schedules_after_precleanup_while_vector_workspace_is_pending(self):
+        controller=self.vector_workspace_controller();secret=self.secret()
+        pending=dict(secret,**{'lifecycle-state':'PENDING_DELETION','time-of-deletion':'deadline'})
+        with mock.patch.object(cleanup,'oci',side_effect=[secret,{},pending]):
+            result=cleanup.schedule_secret(self.cfg,controller,apply=True)
+        self.assertEqual(result['state'],'PENDING_DELETION')
+        self.assertFalse(controller.saved['runtime_verified'])
+        self.assertEqual(controller.saved['operations']['/workspaces/vector']['status'],'DEFERRED_TO_PARENT')
+
+    def test_parent_verification_failure_stops_before_lakehouse_and_iam(self):
+        events=[]
+        with mock.patch.object(poc,'managed',return_value=True), \
+             mock.patch.object(poc,'state',return_value={}), \
+             mock.patch.object(poc,'tf_stage',side_effect=lambda cfg,stage,**kwargs:events.append(stage)), \
+             mock.patch.object(poc,'inference') as inference:
+            with self.assertRaises(poc.PocError):
+                poc.destroy_infrastructure(self.cfg,argparse.Namespace(yes=True),apply=True,
+                    after_aidp=mock.Mock(side_effect=poc.PocError('parent not verified')))
+            inference.assert_not_called()
+        self.assertNotIn('lakehouse',events);self.assertNotIn('iam',events)
+
+    def test_resume_after_parent_destroy_checks_control_plane_before_other_infrastructure(self):
+        controller=self.vector_workspace_controller()
+        self.write(self.folder/'states/aidp/terraform.tfstate',{'version':4,'resources':[],'outputs':{}})
+        with mock.patch.object(cleanup,'output',side_effect=poc.PocError('no outputs')), \
+             mock.patch.object(cleanup,'oci',return_value={'items':[]}) as cloud:
+            restored=self.controller(additional_workspaces=['vector'])
+            self.assertIsNone(restored.aidp_id)
+            self.assertTrue(restored.saved['runtime_verified']);cloud.assert_called_once()
+        self.assertEqual(restored.saved['operations']['/workspaces/vector']['status'],'REMOVED_WITH_PARENT')
+
+    def test_empty_output_fallback_requires_a_real_empty_terraform_state(self):
+        with mock.patch.object(cleanup,'output',side_effect=poc.PocError('no outputs')):
+            with self.assertRaises(poc.PocError):cleanup.remaining_output(self.cfg,'aidp')
+            self.write(self.folder/'states/aidp/terraform.tfstate',{})
+            with self.assertRaises(poc.PocError):cleanup.remaining_output(self.cfg,'aidp')
+            self.write(self.folder/'states/aidp/terraform.tfstate',{'version':4,'resources':[],'outputs':{}})
+            self.assertEqual(cleanup.remaining_output(self.cfg,'aidp'),{})
+
     def test_resume_after_lost_delete_response_does_not_repeat_completed_deletion(self):
         controller = self.controller();controller.preview()
         self.api.interrupt_after_delete = '/workspaces/ws/agents/rag/deployments/rag-prod'

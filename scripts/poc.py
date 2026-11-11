@@ -289,10 +289,12 @@ def inference(cfg, *, apply, destroy=False, args=None):
     subprocess.run(argv,check=True)
 
 
-def destroy_infrastructure(cfg, args, *, apply):
+def destroy_infrastructure(cfg, args, *, apply, after_aidp=None):
     for stage in reversed(AIDP_STAGES):
         if managed(state(Path(cfg['state_directory'])/stage/'terraform.tfstate')):
             tf_stage(cfg,stage,apply=apply,destroy=True,yes=args.yes)
+        if stage == 'aidp' and apply and after_aidp:
+            after_aidp()
     inference(cfg,apply=apply,destroy=True,args=args)
 
 
@@ -382,7 +384,7 @@ def main(argv=None):
                 from cleanup import automated_destroy
                 automated_destroy(cfg,args,
                     preview_infrastructure=lambda:destroy_infrastructure(cfg,args,apply=False),
-                    apply_infrastructure=lambda:destroy_infrastructure(cfg,args,apply=True))
+                    apply_infrastructure=lambda after_aidp=None:destroy_infrastructure(cfg,args,apply=True,after_aidp=after_aidp))
                 return
             if args.apply and not args.confirm_aidp_runtime_removed:
                 raise PocError('Remove AIDP agents/AI Compute/workspace dependencies first; then use --confirm-aidp-runtime-removed.')

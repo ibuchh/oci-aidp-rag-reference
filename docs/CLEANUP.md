@@ -40,7 +40,7 @@ DEPLOYMENT_DIR="deployments/$POC_NAME"
 
 Expected: an AIDP/RAG cleanup inventory, any blockers, a proposed secret-deletion schedule and the Terraform destroy plans. Preview sends no mutating AIDP requests, schedules no secret deletion and applies no Terraform changes. Reports are private files under `deployments/NAME/cleanup/`.
 
-The scope includes all endpoint versions discovered under the exact recorded agents, Playground compute detachment, those agents, recorded document files, a cascading deletion of the owned dedicated RAG schema, recorded Credential Store entries, the shared owned AI Compute and private workspace. The schema cascade includes every child object in that dedicated namespace, including the native KB, indexed vectors and managed document volume; it never targets the entire default catalog. An unrecorded file/folder, agent, compute, job or credential blocks automatic deletion. The instance's named default workspace stays until Terraform removes the AIDP instance.
+The scope includes all endpoint versions discovered under the exact recorded agents, Playground compute detachment, those agents, recorded document files, a cascading deletion of the owned dedicated RAG schema, recorded Credential Store entries, the shared owned AI Compute and private workspace. The schema cascade includes every child object in that dedicated namespace, including the native KB, indexed vectors and managed document volume; it never targets the entire default catalog. An unrecorded file/folder, agent, compute, job or credential blocks automatic deletion. The instance's named default workspace stays until Terraform removes the AIDP instance. An explicitly selected workspace associated with the Vector Database may also have to remain until AIDP deletion; see the parent-deletion exception below.
 
 To find an additional workspace key, first run the preview command above **without** `--additional-workspace`. Read the `BLOCKED: Untracked workspace` lines, for example:
 
@@ -84,12 +84,16 @@ The apply sequence is:
 1. Recheck the target and ownership, and generate all infrastructure destroy previews before any deletion.
 2. Create and verify a private local archive of the supplied configuration, source files, Terraform states and deployment inventories under `.local/cleanup-backups/TIMESTAMP/`. The archive and checksum manifest contain sensitive information and must stay private. Provider caches and symlinks are excluded.
 3. Remove endpoint versions, detach Playground compute and remove owned agents. Delete recorded RAG originals, then cascade-delete only the owned dedicated RAG schema and verify its disappearance. Remove the recorded credentials, compute and private workspace. Remove only explicitly selected additional workspaces after RAG cleanup, keeping their ingestion compute available until then.
-4. Verify the recorded runtime scope is empty, then schedule an Active inference secret for deletion with an eight-day delay. An already pending deletion keeps its original deadline. Metadata identity, compartment and Vault must match; no secret contents are retrieved.
-5. Apply newly reviewed Terraform destroy plans in dependency order and delete the recorded retained boot volumes.
+4. Verify runtime pre-cleanup, recording any service-confirmed Vector Database workspace deferral, then schedule an Active inference secret for deletion with an eight-day delay. An already pending deletion keeps its original deadline. Metadata identity, compartment and Vault must match; no secret contents are retrieved.
+5. Apply newly reviewed Terraform destroy plans in dependency order. Immediately after AIDP destruction, verify that its Terraform state is empty and the exact instance is deleted or absent from a successful OCI control-plane listing. This completes any deferred workspace removal before Lakehouse and supporting policies are removed. Continue with the remaining infrastructure and recorded retained boot volumes.
 
 **The automatic archive contains local controller files, not remote FSS/model data, database contents, Grafana history or uploaded document originals.** Export remote data separately before applying if it must survive. `--delete-data` explicitly approves losing that remote data. Keep the imported GPU image for rebuilding.
 
 Playground cleanup deselects each owned agent's Playground AI Compute and waits for its attachment and TEST runtime to clear before deleting that agent. If detachment cannot be verified, cleanup stops before secret scheduling or infrastructure destruction. After a failure or timeout, resolve the reported issue and rerun the same apply command with the same configuration and workspace selections. Keep the existing journal; completed deletions are reconciled and already removed endpoints are not recreated.
+
+**Vector Database workspace exception:** AIDP can reject a standalone workspace deletion with `403 NotAllowed` and a detailed message explaining that a workspace associated with the Vector Database can only be deleted as part of AI Data Platform deletion. For an explicitly selected additional workspace, cleanup recognizes only that exact service restriction and records `DEFERRED_TO_PARENT`; it does not report the workspace as deleted or change its permissions. Other 403 responses still stop cleanup. The existing `--apply --include-runtime --delete-data --confirm-name` guards remain required.
+
+When ordinary runtime cleanup is verified, `runtime_precleanup_verified` becomes `true`. If a workspace is deferred, `runtime_verified` remains `false` until parent AIDP deletion is confirmed. The controller then records `REMOVED_WITH_PARENT` and `parent_deletion_verified`. If parent verification fails, it stops before Lakehouse and supporting policies are removed. Keep the same workspace selection and journal when resuming; do not attempt to bypass the service restriction by changing workspace permissions or injecting internal deletion headers.
 
 Progress is recorded under `deployments/NAME/cleanup/journal.json`. Accepted asynchronous operations are polled and recorded. If a request, permission check, dependency removal or wait fails, later phases stop. Rerun the same command with the same configuration and inventories to resume. `--cleanup-wait-minutes 60` extends the per-operation wait from its default 30 minutes. Never erase state or the journal to bypass a failure.
 
@@ -103,7 +107,7 @@ The automated apply handles both kinds of recorded credentials:
 
 - AIDP Credential Store entries, including the Vault reference and synthetic probe, are deleted during runtime cleanup.
 - The separately recorded inference API-key secret in OCI Vault is scheduled for deletion eight days after successful runtime cleanup. An existing pending deadline is preserved. Unrelated secrets are outside this cleanup scope.
-- A preview schedules nothing. If runtime cleanup stops, the command does not proceed to inference-secret scheduling or infrastructure destruction. A secret already pending deletion from an earlier run retains that state.
+- A preview schedules nothing. If runtime cleanup stops on an unresolved error, the command does not proceed to inference-secret scheduling or infrastructure destruction. A recorded Vector Database workspace deferral is an expected dependency on parent AIDP deletion, so verified pre-cleanup can proceed to secret scheduling and the reviewed infrastructure plans. A secret already pending deletion from an earlier run retains that state.
 
 `PENDING_DELETION` is the expected immediate Vault result, rather than permanent deletion. The secret becomes unavailable while deletion is pending; permanent removal follows its scheduled deadline. See [Oracle secret deletion](https://docs.oracle.com/en-us/iaas/Content/secret-management/Tasks/delete-secret.htm). Vault and encryption-key deletion can have their own pending deadlines.
 
@@ -115,7 +119,8 @@ import json, sys
 from pathlib import Path
 record = json.loads(Path(sys.argv[1]).read_text())
 print(json.dumps({name: record.get(name) for name in (
-    "runtime_verified", "infrastructure_completed", "secret"
+    "runtime_precleanup_verified", "runtime_verified",
+    "parent_deletion_verified", "infrastructure_completed", "secret"
 )}, indent=2))
 PYCODE
 
@@ -187,12 +192,12 @@ Expected: baseline chat/tool acceptance still passes. Do not schedule secret del
 #### 2b. Continue with baseline resources for a whole-stack teardown
 
 1. In `vllm-aidp-poc-private`, undeploy the endpoint for `vllm_aidp_poc_agent` and every remaining owned earlier version. Detach its Playground test runtime and agent compute attachment, then delete the agent.
-2. Delete `vllm_aidp_poc_ai_compute` only after both baseline and RAG agents are detached, and wait for completion.
+2. Delete `vllm_aidp_poc_ai_compute` only after both baseline and RAG agents are detached, and wait for completion. A workspace associated with the Vector Database must remain for parent AIDP deletion; record that service restriction rather than trying to delete it independently.
 3. In Credential Store, remove the recorded `vllm_aidp_poc_vllm_key` Vault reference and `vllm_aidp_poc_credential_probe` synthetic item. Removing a reference does not delete its underlying Vault secret.
 4. Remove the owned uploaded code folders recorded by the baseline inventory. Delete the owned private workspace after its dependencies are gone.
 5. Inspect other POC-owned ingestion jobs, workspaces, Master Catalog/Spark compute, managed data, buckets, objects, attachments and retention settings. Remove these through supported service cleanup only after their consumers are gone. Do not assume deleting the AIDP instance purges retained storage or unrelated assets.
 
-Leave the Terraform-managed AIDP instance and Lakehouse for step 4. The `--confirm-aidp-runtime-removed` flag is the operator's acknowledgment, not an automatic RAG/KB dependency check. Set it only after the full recorded data-plane inventory has been reconciled. For automated whole-stack teardown, use `destroy.sh --include-runtime` above instead of these manual steps. `aidp_workspace.py` and `rag.py` do not expose standalone destroy actions.
+Leave the Terraform-managed AIDP instance, its default workspace, any service-protected Vector Database workspace and Lakehouse for step 4. The `--confirm-aidp-runtime-removed` flag is the operator's acknowledgment, not an automatic RAG/KB dependency check. Set it only after the full recorded data-plane inventory has been reconciled. For automated whole-stack teardown, use `destroy.sh --include-runtime` above instead of these manual steps. `aidp_workspace.py` and `rag.py` do not expose standalone destroy actions.
 
 Oracle procedures: [AI Compute](https://docs.oracle.com/en/cloud/paas/ai-data-platform/aidug/ai-compute.html), [Workspaces](https://docs.oracle.com/en/cloud/paas/ai-data-platform/aidug/workspaces.html), [Credential Store](https://docs.oracle.com/en/cloud/paas/ai-data-platform/aidug/credential-store.html).
 

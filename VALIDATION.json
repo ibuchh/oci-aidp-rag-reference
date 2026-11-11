@@ -363,5 +363,37 @@
       "The previously denied additional-workspace deletion has not been retried by the assistant; its detailed service rejection remains to be captured if it recurs."
     ],
     "cloud_mutations_executed_by_assistant": false
+  },
+  "vector_workspace_parent_deletion_fix": {
+    "verified_utc": "2026-11-11T21:59:52.990394+00:00",
+    "status": "PASS",
+    "controller_tests_passed": 133,
+    "cause": "The service forbids standalone deletion of a workspace associated with the Vector Database and requires deletion through its parent AIDP instance.",
+    "change": "Recognize only that exact rejection for an explicitly selected additional workspace; record DEFERRED_TO_PARENT, allow verified pre-cleanup to proceed, and verify the parent immediately after its Terraform stage before removing Lakehouse or supporting policies. Mark REMOVED_WITH_PARENT only after empty Terraform state and successful control-plane listing prove parent deletion. Resume safely from confirmed empty component states.",
+    "checks": [
+      "Unexpected 403 responses and unselected workspace restrictions remain fatal.",
+      "A deferred workspace remains present and runtime_verified stays false before parent verification.",
+      "Changed deferred identities, malformed listings, authorization errors, active parents and missing/nonempty state block confirmation.",
+      "Secret scheduling follows verified pre-cleanup while parent deletion remains pending.",
+      "Parent verification failure stops before Lakehouse and IAM removal.",
+      "Interrupted infrastructure cleanup can resume after verified AIDP deletion.",
+      "All cleanup shell blocks parse in Bash and Zsh; local Markdown links and future handover build match current source.",
+      "Installed pinned OCI provider schema and its parent-deletion work-request handling inspected read-only."
+    ],
+    "live_read_only_and_local_replay": {
+      "status": "PASS",
+      "live_get_requests": 20,
+      "captured_service_rejection_replayed_locally": true,
+      "cloud_delete_requests_sent": 0,
+      "secret_or_infrastructure_mutations": 0,
+      "runtime_precleanup_verified": true,
+      "runtime_verified": false,
+      "deferred_workspaces": 1
+    },
+    "limitations": [
+      "The corrected full destructive sequence has not been executed by the assistant; the operator performs live acceptance.",
+      "Service-managed storage and retention/backups still require final service-side checks."
+    ],
+    "cloud_mutations_executed_by_assistant": false
   }
 }

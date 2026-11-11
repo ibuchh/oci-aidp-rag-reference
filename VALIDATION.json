@@ -286,5 +286,11 @@
         "document_shell_blocks": 74
       }
     }
+  },
+  "workspace_key_discovery_docs": {
+    "updated_utc": "2026-11-11T18:13:17.518144+00:00",
+    "change": "Explain deriving EXTRA_WORKSPACE_KEY from the GET-only cleanup preview, including the BLOCKED output example.",
+    "code_unchanged": true,
+    "cloud_commands_executed": false
   }
 }

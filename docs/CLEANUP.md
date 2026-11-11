@@ -38,10 +38,18 @@ Expected: an AIDP/RAG cleanup inventory, any blockers, a proposed secret-deletio
 
 The scope includes all endpoint versions discovered under the exact recorded agents, Playground compute detachment, those agents, recorded document files, a cascading deletion of the owned dedicated RAG schema, recorded Credential Store entries, the shared owned AI Compute and private workspace. The schema cascade includes every child object in that dedicated namespace, including the native KB, indexed vectors and managed document volume; it never targets the entire default catalog. An unrecorded file/folder, agent, compute, job or credential blocks automatic deletion. The instance's named default workspace stays until Terraform removes the AIDP instance.
 
-An additional workspace is never adopted by display name. Review its key and contents, then explicitly select it in both preview and apply:
+To find an additional workspace key, first run the preview command above **without** `--additional-workspace`. Read the `BLOCKED: Untracked workspace` lines, for example:
+
+```text
+BLOCKED: Untracked workspace example-workspace [WORKSPACE_KEY]
+```
+
+The value inside the square brackets is the workspace key returned by AIDP's read-only workspace listing. Copy that value into `EXTRA_WORKSPACE_KEY` below. The key identifies a workspace inside the selected AIDP instance; it is not a compartment OCID. Use the key from your own deployment's output. Do not copy a key from another tenancy or example. If no untracked workspace is reported, omit `--additional-workspace`.
+
+An additional workspace is never adopted by display name. Review the discovered workspace and all its contents, then explicitly select its key in both preview and apply:
 
 ```bash
-EXTRA_WORKSPACE_KEY=REPLACE_WITH_REVIEWED_WORKSPACE_KEY
+EXTRA_WORKSPACE_KEY=REPLACE_WITH_KEY_FROM_PREVIEW
 
 ./destroy.sh \
   --config "$CONFIG" \

@@ -1,0 +1,12 @@
+# Reference only. The controller generates resolved inputs and an isolated backend.
+oci_profile = "CUSTOMER_POC"
+region = "REPLACE_WITH_CUSTOMER_REGION"
+compartment_id = "REPLACE_WITH_POC_COMPARTMENT_OCID"
+name = "vllm-aidp-poc"
+vcn_id = "REPLACE_WITH_VCN_OCID"
+private_route_table_id = "REPLACE_WITH_PRIVATE_ROUTE_TABLE_OCID"
+dhcp_options_id = "REPLACE_WITH_DHCP_OCID"
+inference_private_ip = "10.160.33.19"
+workspace_cidr = "10.160.36.0/24"
+vcn_dns_ip = "169.254.169.254"
+gpu_https_nsg_id = "REPLACE_WITH_GPU_ATTACHED_NSG_OCID"

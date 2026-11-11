@@ -1,0 +1,13 @@
+variable "oci_profile" { default = "DEFAULT" }
+variable "region" { default = "eu-frankfurt-1" }
+variable "compartment_id" { type = string }
+variable "availability_domain" { type = string }
+variable "image_id" { type = string }
+variable "ssh_public_key_path" { default = "~/.ssh/id_rsa.pub" }
+variable "name" { default = "vllm-aidp-poc" }
+variable "subnet_cidr" { default = "10.160.35.0/24" }
+variable "private_ip" { default = "10.160.35.10" }
+variable "shape" { default = "VM.Standard.E5.Flex" }
+variable "ocpus" { default = 2 }
+variable "memory_gbs" { default = 16 }
+variable "metrics_volume_gbs" { default = 100 }

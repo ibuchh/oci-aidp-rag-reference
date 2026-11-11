@@ -1,0 +1,10 @@
+{
+  "base_url": "https://REPLACE_WITH_ACTUAL_PRIVATE_IP/v1",
+  "model": "qwen3-8b",
+  "ca_file": "/absolute/runtime/path/inference-ca.crt",
+  "api_key_file": null,
+  "api_key_secret_id": null,
+  "region": "REPLACE_WITH_CUSTOMER_REGION",
+  "timeout_seconds": 120,
+  "max_tokens": 512
+}

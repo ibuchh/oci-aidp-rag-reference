@@ -1,0 +1,20 @@
+SYNTHETIC POC DOCUMENT — NOT A CUSTOMER POLICY
+Document ID: ASTER-RELEASE-01
+Title: Project Aster release and rollback policy
+Version: 2026-11-10
+
+Project Aster is a fictional internal demonstration service. Its release approval
+code is LANTERN-731. The required rollback verification phrase is MAPLE-4729.
+Only the synthetic Release Steward role may approve a deployment in this example.
+
+Before a release, the Release Steward checks that the candidate answers all five
+golden test questions and that the document index reports a successful ingestion.
+Record the model revision, knowledge-base version and test report before approval.
+
+If a release fails its acceptance checks, stop new requests, switch the application
+to the previous approved agent endpoint, and repeat the five golden tests. The
+rollback verification phrase must appear in the change record. A rollback does
+not restore deleted documents or database data.
+
+These names, codes and procedures are fabricated solely to test document-grounded
+retrieval. They do not grant real access or represent Oracle operational policy.

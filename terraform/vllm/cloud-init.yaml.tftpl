@@ -1,0 +1,130 @@
+#cloud-config
+package_update: true
+packages:
+  - docker.io
+  - nfs-common
+  - nginx
+  - openssl
+  - curl
+  - gnupg
+write_files:
+  - path: /opt/vllm/firewall.sh
+    permissions: '0700'
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+      if ! iptables -C INPUT -p tcp -s ${bastion_cidr} --dport 443 -j ACCEPT 2>/dev/null; then
+        iptables -I INPUT 1 -p tcp -s ${bastion_cidr} --dport 443 -j ACCEPT
+      fi
+  - path: /etc/systemd/system/vllm-firewall.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Allow private vLLM HTTPS from the Bastion subnet
+      After=network-online.target
+      Before=nginx.service
+      [Service]
+      Type=oneshot
+      ExecStart=/opt/vllm/firewall.sh
+      RemainAfterExit=yes
+      [Install]
+      WantedBy=multi-user.target
+  - path: /opt/vllm/download-model.py
+    permissions: '0644'
+    content: |
+      import json
+      from pathlib import Path
+      from huggingface_hub import snapshot_download
+      snapshot_download(
+          repo_id="Qwen/Qwen3-8B",
+          revision="${model_revision}",
+          local_dir="/models/Qwen3-8B/${model_revision}",
+      )
+      cfg = json.loads(Path("/models/Qwen3-8B/${model_revision}/tokenizer_config.json").read_text())
+      Path("/setup/chat_template.jinja").write_text("{% set enable_thinking = false %}\n" + cfg["chat_template"])
+  - path: /etc/systemd/system/vllm.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=vLLM Qwen3-8B inference
+      Requires=docker.service
+      After=docker.service network-online.target remote-fs.target
+      Wants=network-online.target
+      RequiresMountsFor=/mnt/models
+      [Service]
+      EnvironmentFile=/etc/vllm/server.env
+      ExecStartPre=/usr/bin/mountpoint -q /mnt/models
+      ExecStart=/usr/bin/docker run --rm --name vllm --gpus all --shm-size 4g --env VLLM_API_KEY --publish 127.0.0.1:8000:8000 --volume /mnt/models:/models:ro --volume /var/lib/vllm/cache:/root/.cache --volume /opt/vllm/chat_template.jinja:/config/chat_template.jinja:ro ${vllm_image} --model /models/Qwen3-8B/${model_revision} --served-model-name qwen3-8b --dtype half --tensor-parallel-size 2 --max-model-len 4096 --max-num-seqs 4 --gpu-memory-utilization 0.85 --chat-template /config/chat_template.jinja --enable-auto-tool-choice --tool-call-parser hermes
+      ExecStop=/usr/bin/docker stop --time 120 vllm
+      Restart=on-failure
+      RestartSec=15
+      TimeoutStartSec=0
+      TimeoutStopSec=150
+      [Install]
+      WantedBy=multi-user.target
+  - path: /opt/vllm/bootstrap.sh
+    permissions: '0700'
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+      nvidia-smi
+      if ! command -v nvidia-ctk >/dev/null; then
+        curl --fail --retry 5 -sSL https://nvidia.github.io/libnvidia-container/gpgkey -o /tmp/nvidia-container-key
+        gpg --dearmor --yes -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg /tmp/nvidia-container-key
+        curl --fail --retry 5 -sSL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list -o /tmp/nvidia-container-toolkit.list
+        sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' /tmp/nvidia-container-toolkit.list > /etc/apt/sources.list.d/nvidia-container-toolkit.list
+        apt-get update
+        DEBIAN_FRONTEND=noninteractive apt-get install -y nvidia-container-toolkit
+      fi
+      nvidia-ctk runtime configure --runtime=docker
+      systemctl enable --now docker
+      systemctl restart docker
+      mkdir -p /mnt/models /var/lib/vllm/cache /etc/vllm /etc/nginx/tls
+      chmod 700 /etc/vllm /etc/nginx/tls
+      echo '${mount_ip}:/models /mnt/models nfs defaults,_netdev,nofail 0 0' >> /etc/fstab
+      mount /mnt/models
+      mountpoint -q /mnt/models
+      docker pull ${vllm_image}
+      docker image inspect ${vllm_image} --format '{{index .RepoDigests 0}}' > /opt/vllm/image-digest.txt
+      docker run --rm --gpus all --entrypoint nvidia-smi ${vllm_image}
+      docker run --rm --entrypoint python3 -v /mnt/models:/models -v /opt/vllm:/setup ${vllm_image} /setup/download-model.py
+      umask 077
+      if [ ! -s /etc/vllm/server.env ]; then
+        printf 'VLLM_API_KEY=%s\n' "$(openssl rand -hex 32)" > /etc/vllm/server.env
+      fi
+      private_ip='${inference_private_ip}'
+      openssl req -x509 -newkey rsa:3072 -nodes -days 30 -keyout /etc/nginx/tls/server.key -out /etc/nginx/tls/server.crt -subj '/CN=inference.lab' -addext "subjectAltName=DNS:inference.lab,IP:$private_ip"
+      cat > /etc/nginx/sites-available/vllm <<'NGINX'
+      server {
+        listen 443 ssl;
+        server_name _;
+        ssl_certificate /etc/nginx/tls/server.crt;
+        ssl_certificate_key /etc/nginx/tls/server.key;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        client_max_body_size 10m;
+        location /v1/ {
+          proxy_pass http://127.0.0.1:8000;
+          proxy_http_version 1.1;
+          proxy_set_header Host $host;
+          proxy_set_header Authorization $http_authorization;
+          proxy_buffering off;
+          proxy_read_timeout 300s;
+        }
+        location = /health {
+          proxy_pass http://127.0.0.1:8000/health;
+        }
+        location / { return 404; }
+      }
+      NGINX
+      ln -sf /etc/nginx/sites-available/vllm /etc/nginx/sites-enabled/vllm
+      if [ -e /etc/nginx/sites-enabled/default ]; then
+        unlink /etc/nginx/sites-enabled/default
+      fi
+      nginx -t
+      systemctl enable nginx
+      systemctl restart nginx
+      systemctl daemon-reload
+      systemctl enable --now vllm-firewall
+      systemctl enable --now vllm
+runcmd:
+  - [bash, /opt/vllm/bootstrap.sh]

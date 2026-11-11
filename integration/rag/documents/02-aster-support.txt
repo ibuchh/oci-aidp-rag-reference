@@ -1,0 +1,17 @@
+SYNTHETIC POC DOCUMENT — NOT A CUSTOMER POLICY
+Document ID: ASTER-SUPPORT-02
+Title: Project Aster support and escalation
+Version: 2026-11-10
+
+The fictional Project Aster support window is 09:00 to 17:00 UTC, Monday to Friday.
+Its first escalation queue is called ORCHID-DESK. For this demonstration, a critical
+incident must be acknowledged within 17 minutes. The escalation reference is
+ASTER-ESC-620. These are synthetic test values, not real service commitments.
+
+A request with no supporting indexed document must receive the answer:
+"The knowledge base does not contain that information."
+Do not invent a phone number, email address, employee name or contractual promise.
+
+An incident record includes the affected synthetic document ID, the user question,
+the returned source citations, the agent endpoint version and the observed result.
+Do not put API tokens, passwords or private keys in an incident record.

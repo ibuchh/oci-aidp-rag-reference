@@ -1,0 +1,9 @@
+# Reference only. The controller generates resolved inputs and an isolated backend.
+oci_profile = "CUSTOMER_POC"
+region = "REPLACE_WITH_CUSTOMER_REGION"
+compartment_id = "REPLACE_WITH_POC_COMPARTMENT_OCID"
+name = "vllm-aidp-poc"
+availability_domain = "REPLACE_WITH_SELECTED_AD_NAME"
+admin_cidr = "REPLACE_WITH_SSH_EGRESS_IPV4/32"
+vcn_cidr = "10.160.0.0/16"
+bastion_name = "vllmaidppoc"

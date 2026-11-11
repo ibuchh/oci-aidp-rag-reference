@@ -1,0 +1,30 @@
+services:
+  streamlit-client:
+    build:
+      context: .
+      args:
+        PYTHON_IMAGE: ${PYTHON_IMAGE:?Resolve the official Python image digest first}
+    container_name: vllm-streamlit-client
+    network_mode: host
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 768m
+    cpus: 1
+    pids_limit: 128
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+    env_file:
+      - /etc/vllm-streamlit-client/inference.env
+    environment:
+      POC_CONNECTION_CONFIG: /run/inference/connection.json
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+    volumes:
+      - /opt/vllm-streamlit-client/connection.json:/run/inference/connection.json:ro
+      - /etc/vllm-streamlit-client/gpu.crt:/run/inference/gpu.crt:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

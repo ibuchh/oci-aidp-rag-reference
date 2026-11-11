@@ -1,0 +1,11 @@
+{
+  "host": "127.0.0.1",
+  "port": 8443,
+  "tls_hostname": "inference.lab",
+  "ca_file": "/absolute/path/to/gpu.crt",
+  "key_file": "/absolute/path/to/protected-api-key",
+  "model": "qwen3-8b",
+  "label": "Mac through Bastion",
+  "grafana_url": "",
+  "context_limit": 4096
+}

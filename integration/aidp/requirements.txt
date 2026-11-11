@@ -1,0 +1,3 @@
+# AIDP's documented graph version. Prefer the platform-provided installation.
+# Do not override platform libraries without checking dependency conflicts.
+langgraph==1.0.1

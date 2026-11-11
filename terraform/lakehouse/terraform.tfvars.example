@@ -1,0 +1,10 @@
+# Reference only. The controller generates resolved inputs and an isolated backend.
+oci_profile = "CUSTOMER_POC"
+region = "REPLACE_WITH_CUSTOMER_REGION"
+compartment_id = "REPLACE_WITH_POC_COMPARTMENT_OCID"
+name = "vllm-aidp-poc"
+subnet_id = "REPLACE_WITH_LAKEHOUSE_SUBNET_OCID"
+nsg_id = "REPLACE_WITH_LAKEHOUSE_NSG_OCID"
+admin_secret_id = "REPLACE_WITH_ADMIN_SECRET_OCID"
+ecpus = 2
+storage_tbs = 1

@@ -1,0 +1,202 @@
+{
+  "status": "PASS",
+  "validated_utc": "2026-11-11T15:44:15.496063+00:00",
+  "cloud_resources_created": false,
+  "customer_tenancy_deployment_performed": false,
+  "test_suite_counts": [
+    84,
+    23,
+    35,
+    12
+  ],
+  "terraform_roots_validated": 10,
+  "checks": [
+    "Python compilation and Bash syntax",
+    "Terraform formatting, locked-provider initialization and validation",
+    "Terraform mock-provider tests",
+    "Controller, safety and live-progress tests",
+    "Streamlit app, client, package, Buildx and launcher tests",
+    "AIDP agent, client, renderer and verification tests",
+    "RAG ownership reconciliation, grounding, citations, wallet cleanup and request metadata tests"
+  ],
+  "notes": [
+    "Built from verified customer release 20261111T061834Z plus the reusable RAG extension and local RAG validation.",
+    "No live deployment files, credentials, runtime captures or Terraform state are packaged.",
+    "Local validation does not constitute a customer deployment."
+  ],
+  "documentation_review": {
+    "verified_utc": "2026-11-11T15:56:21.701681+00:00",
+    "files": [
+      "CUSTOMER_HANDOVER.md",
+      "README.md",
+      "docs/DEPLOYMENT.md",
+      "docs/CLEANUP.md",
+      "docs/CONFIGURATION.md",
+      "docs/IAM.md",
+      "docs/VALIDATION.md",
+      "docs/RAG_KNOWLEDGE_BASE.md",
+      "integration/rag/README.md"
+    ],
+    "shell_blocks_syntax_checked": 50,
+    "local_links_verified": 51,
+    "cli_help_checks": [
+      "scripts/poc.py",
+      "scripts/aidp_workspace.py",
+      "integration/rag/rag.py",
+      "integration/rag/rag_poc.py",
+      "integration/rag/upload_documents.py"
+    ],
+    "code_unchanged": true,
+    "cloud_commands_executed": false
+  },
+  "rag_diagram_review": {
+    "verified_utc": "2026-11-11T16:18:02.144290+00:00",
+    "pages": [
+      {
+        "file": "diagrams/vllm-aidp-oci-architecture.drawio",
+        "tabs": 6,
+        "rag_tab": "06 - AIDP RAG architecture",
+        "editable_cells": 118
+      },
+      {
+        "file": "vllm-aidp-deployment/diagrams/vllm-aidp-completed-architecture.drawio",
+        "tabs": 3,
+        "rag_tab": "03 - AIDP RAG architecture",
+        "editable_cells": 118
+      },
+      {
+        "file": "handoff/full-stack/20261111T154344Z/customer-vllm-aidp-poc/diagrams/vllm-aidp-completed-architecture.drawio",
+        "tabs": 3,
+        "rag_tab": "03 - AIDP RAG architecture",
+        "editable_cells": 118
+      }
+    ],
+    "existing_customer_pages_unchanged": false,
+    "generator_compiles_and_reproduces_three_pages": true,
+    "visual_review": "Opened, saved and visually checked the straightened route in draw.io; captured native screenshot.",
+    "preview": "validation/diagrams/slide-06-spacing.png",
+    "connector_refinement": "Steps 1 and 5 use separate, horizontally aligned request/response arrows in a wider left connector space. The cited-answer label includes its source-filename example. Steps 2, 3 and 4 retain the corrected routing.",
+    "cloud_commands_executed": false,
+    "current_layout_note": "User removed footer sections on all three architecture pages; only page heights and RAG boundary heights were adjusted."
+  },
+  "slide_spacing_review": {
+    "verified_utc": "2026-11-11T16:25:47.276966+00:00",
+    "pages": [
+      {
+        "id": "completed-architecture",
+        "name": "01 - Reference architecture",
+        "page_height": 1780,
+        "editable_cells": 246,
+        "removed_cells": [
+          "acceptance",
+          "acceptance-label",
+          "footnote"
+        ]
+      },
+      {
+        "id": "verified-request-flow",
+        "name": "02 - Agent request flow",
+        "page_height": 1420,
+        "editable_cells": 75,
+        "removed_cells": [
+          "notes",
+          "proof",
+          "proof-fields",
+          "proof-title"
+        ]
+      },
+      {
+        "id": "aidp-rag-architecture",
+        "name": "03 - AIDP RAG architecture",
+        "page_height": 1160,
+        "editable_cells": 118,
+        "removed_cells": [
+          "rag-footer",
+          "rag-grounding",
+          "rag-validation",
+          "rag-validation-copy"
+        ]
+      }
+    ],
+    "remaining_cell_geometry_preserved": true,
+    "user_deletions_preserved": true,
+    "unrelated_main_tabs_preserved": true,
+    "visual_review": "Reviewed slides 4, 5 and 6 in draw.io at Fit Page; native screenshots saved under validation/diagrams/slide-0N-spacing.png.",
+    "cloud_commands_executed": false,
+    "sequence_replaced_later": true
+  },
+  "rag_request_sequence_review": {
+    "verified_utc": "2026-11-11T16:29:26.213137+00:00",
+    "main_tab": "05 - AIDP RAG request flow",
+    "customer_tab": "02 - AIDP RAG request flow",
+    "editable_cells": 77,
+    "page_height": 1370,
+    "flow": "Question, native KB vector search, retrieved chunks, grounded prompt, named inference credential, private model request, answer and source citations.",
+    "other_tabs_unchanged": true,
+    "removed_footer_sections_remain_absent": true,
+    "visual_review": "Opened and saved in draw.io; native screenshot: validation/diagrams/slide-05-rag-flow.png",
+    "cloud_commands_executed": false
+  },
+  "embedded_diagrams_review": {
+    "verified_utc": "2026-11-11T16:50:15.275649+00:00",
+    "images": [
+      {
+        "path": "docs/images/04-stack-architecture.png",
+        "width": 3246,
+        "height": 2621,
+        "sha256": "e43437369b542f3635153af0bd1b5c9f8c5e7b136bb313e2b80b39265024e594"
+      },
+      {
+        "path": "docs/images/05-aidp-rag-flow.png",
+        "width": 3197,
+        "height": 2008,
+        "sha256": "4cc6cec8a1b898530b55741b6d7d4c55374f3492c7e3a01ae0349f1d051bc708"
+      },
+      {
+        "path": "docs/images/06-aidp-rag-architecture.png",
+        "width": 3501,
+        "height": 1684,
+        "sha256": "791ac595f8e79c8ad5f5a73c812c2a54fa2b847745adf7e07ffb604cf9fbe197"
+      }
+    ],
+    "image_source": "Customer-neutral draw.io pages 1, 2 and 3, corresponding to main slides 4, 5 and 6.",
+    "rendering": "Installed draw.io desktop exporter, PNG at 1.5 scale with white background and no embedded diagram metadata.",
+    "placements": [
+      "CUSTOMER_HANDOVER.md",
+      "docs/DEPLOYMENT.md",
+      "docs/RAG_KNOWLEDGE_BASE.md",
+      "integration/rag/README.md"
+    ],
+    "visual_review": "All three clean PNG exports inspected for readable content and unclipped labels.",
+    "shell_blocks_checked": 36,
+    "local_links_verified": 68,
+    "future_prepare_includes_images": true,
+    "deployment_code_unchanged": true,
+    "cloud_commands_executed": false
+  },
+  "final_slide_sync": {
+    "layout_and_connectors": "Matches final saved slides 4, 5 and 6, including both slide 4 user-icon positions.",
+    "customer_label_changes": "Slide 4 uses generic tenancy/region and private IP labels.",
+    "visual_review": "Refreshed slide 4 PNG reviewed.",
+    "cloud_commands_executed": false
+  },
+  "github_publication": {
+    "repository": "ibuchh/oci-aidp-rag-reference",
+    "source_release": "20261111T154344Z",
+    "readme": "Git clone entry point and native RAG architecture preview.",
+    "local_configuration_excluded": true,
+    "only_original_slides": [
+      4,
+      5,
+      6
+    ],
+    "local_checks": {
+      "controller_tests_passed": 84,
+      "python_files_parsed": 63,
+      "shell_scripts_checked": 10,
+      "document_shell_blocks_checked": 71,
+      "local_document_links_verified": 72,
+      "cloud_requests_executed": false
+    }
+  }
+}

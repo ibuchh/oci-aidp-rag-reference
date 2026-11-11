@@ -1,0 +1,11 @@
+*
+!requirements.txt
+!app.py
+!client/
+!client/*.py
+!client/icons/
+!client/icons/*.svg
+!client/icons/LICENSE
+!.streamlit/
+!.streamlit/config.toml
+!Dockerfile

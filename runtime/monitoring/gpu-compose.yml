@@ -1,0 +1,50 @@
+services:
+  node-exporter:
+    image: prom/node-exporter:v1.12.1@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0
+    container_name: node-exporter
+    restart: unless-stopped
+    network_mode: host
+    pid: host
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - /:/host:ro,rslave
+    command:
+      - --path.rootfs=/host
+      - --collector.disable-defaults
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --collector.cpu
+      - --collector.diskstats
+      - --collector.filesystem
+      - --collector.loadavg
+      - --collector.meminfo
+      - --collector.netdev
+      - --collector.netstat
+      - --collector.stat
+      - --collector.time
+      - --collector.uname
+      - --collector.vmstat
+      - --collector.textfile
+      - --collector.nfs
+      - --web.listen-address=127.0.0.1:9100
+      - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fuse.*|hugetlbfs|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|nfs.*)$
+      - --collector.textfile.directory=/host/var/lib/vllm-monitoring/textfile
+  dcgm-exporter:
+    image: nvcr.io/nvidia/k8s/dcgm-exporter:4.9.0@sha256:2490e1dfb5baaee6765ef2841813af7d978bb459a566c22c326a8fc27c64eea9
+    container_name: dcgm-exporter
+    restart: unless-stopped
+    network_mode: host
+    runtime: nvidia
+    cap_add: [SYS_ADMIN]
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: utility
+    volumes:
+      - /opt/vllm-monitoring/dcgm-counters.csv:/etc/dcgm-exporter/counters.csv:ro
+    command:
+      - --remote-hostengine-info=127.0.0.1:5555
+      - --address=127.0.0.1:9400
+      - --collectors=/etc/dcgm-exporter/counters.csv
+      - --collect-interval=15000

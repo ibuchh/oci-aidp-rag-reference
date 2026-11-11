@@ -1,0 +1,70 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 30s
+scrape_configs:
+- job_name: vllm
+  scheme: https
+  metrics_path: /vllm
+  tls_config:
+    ca_file: /etc/prometheus/gpu.crt
+  sample_limit: 10000
+  body_size_limit: 10MB
+  static_configs:
+  - targets:
+    - __GPU_PRIVATE_IP__:9443
+    labels:
+      runtime: standalone
+      environment: lab
+      role: gpu
+      instance: __GPU_PRIVATE_IP__
+- job_name: dcgm
+  scheme: https
+  metrics_path: /gpu
+  tls_config:
+    ca_file: /etc/prometheus/gpu.crt
+  sample_limit: 10000
+  body_size_limit: 10MB
+  static_configs:
+  - targets:
+    - __GPU_PRIVATE_IP__:9443
+    labels:
+      runtime: standalone
+      environment: lab
+      role: gpu
+      instance: __GPU_PRIVATE_IP__
+- job_name: node-gpu
+  scheme: https
+  metrics_path: /node
+  tls_config:
+    ca_file: /etc/prometheus/gpu.crt
+  sample_limit: 10000
+  body_size_limit: 10MB
+  static_configs:
+  - targets:
+    - __GPU_PRIVATE_IP__:9443
+    labels:
+      runtime: standalone
+      environment: lab
+      role: gpu
+      instance: __GPU_PRIVATE_IP__
+- job_name: node-monitoring
+  sample_limit: 10000
+  static_configs:
+  - targets:
+    - 127.0.0.1:9100
+    labels:
+      runtime: standalone
+      environment: lab
+      role: monitoring
+      instance: __MONITORING_PRIVATE_IP__
+- job_name: prometheus
+  sample_limit: 10000
+  static_configs:
+  - targets:
+    - 127.0.0.1:9090
+    labels:
+      runtime: standalone
+      environment: lab
+      role: monitoring
+      instance: __MONITORING_PRIVATE_IP__

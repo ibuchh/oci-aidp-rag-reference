@@ -1,0 +1,7 @@
+# Reference only. The controller generates resolved inputs and an isolated backend.
+oci_profile = "CUSTOMER_POC"
+compartment_id = "REPLACE_WITH_POC_COMPARTMENT_OCID"
+name = "vllm-aidp-poc"
+tenancy_id = "REPLACE_WITH_TENANCY_OCID"
+home_region = "us-ashburn-1"
+lakehouse_admin_secret_id = "REPLACE_WITH_ADMIN_SECRET_OCID"

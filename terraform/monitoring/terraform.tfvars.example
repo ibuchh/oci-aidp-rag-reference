@@ -1,0 +1,10 @@
+# Reference only. The controller generates resolved inputs and an isolated backend.
+oci_profile = "CUSTOMER_POC"
+region = "REPLACE_WITH_CUSTOMER_REGION"
+compartment_id = "REPLACE_WITH_POC_COMPARTMENT_OCID"
+name = "vllm-aidp-poc"
+availability_domain = "REPLACE_WITH_SELECTED_AD_NAME"
+image_id = "REPLACE_WITH_DISCOVERED_UBUNTU_24_04_IMAGE_OCID"
+ssh_public_key_path = "~/.ssh/id_rsa.pub"
+subnet_cidr = "10.160.35.0/24"
+private_ip = "10.160.35.10"

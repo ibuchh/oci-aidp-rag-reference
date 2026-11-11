@@ -1,0 +1,17 @@
+SYNTHETIC POC DOCUMENT — NOT A CUSTOMER POLICY
+Document ID: ASTER-DATA-03
+Title: Project Aster demonstration data handling
+Version: 2026-11-10
+
+Project Aster accepts only fabricated TXT documents for this initial experiment.
+Its fictional data classification label is SYNTHETIC-ASTER. The example retention
+period for an exported evaluation report is 13 days. The synthetic purge review
+code is CEDAR-908. No customer or employee personal information belongs in this POC.
+
+Documents live in a dedicated managed volume. Ingestion splits text into chunks,
+creates embeddings and stores searchable vectors in the AIDP-associated Lakehouse.
+The private answer-generation model receives the question and retrieved excerpts.
+
+Removing an ingestion source and removing its original files are distinct actions.
+Before deleting the overall environment, reconcile the knowledge base, source,
+managed volume, ingestion jobs, agent deployments and any retained artifacts.

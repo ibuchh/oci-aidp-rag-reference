@@ -1,0 +1,9 @@
+output "workspace_subnet_id" { value = oci_core_subnet.workspace.id }
+output "workspace_nsg_id" { value = oci_core_network_security_group.workspace.id }
+output "workspace_cidr" { value = var.workspace_cidr }
+output "lakehouse_subnet_id" { value = oci_core_subnet.workspace.id }
+output "lakehouse_nsg_id" { value = oci_core_network_security_group.lakehouse.id }
+output "vault_id" { value = oci_kms_vault.poc.id }
+output "key_id" { value = oci_kms_key.secrets.id }
+output "lakehouse_admin_secret_id" { value = oci_vault_secret.lakehouse_admin.id }
+output "inference_base_url" { value = "https://${var.inference_private_ip}/v1" }

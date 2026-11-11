@@ -1,0 +1,11 @@
+# Selected basic counters from NVIDIA DCGM Exporter 4.9.0.
+DCGM_FI_DEV_SM_CLOCK_HERTZ, gauge, SM clock frequency in hertz.
+DCGM_FI_DEV_GPU_TEMP_CELSIUS, gauge, GPU temperature (in C).
+DCGM_FI_DEV_BOARD_POWER_WATTS, gauge, Power draw (in W).
+DCGM_FI_DEV_GPU_UTIL_RATIO, gauge, GPU utilization as a ratio.
+DCGM_FI_DEV_MEMORY_UTIL_RATIO, gauge, Memory utilization as a ratio.
+DCGM_FI_DEV_XID_ERROR, gauge, Value of the last XID error encountered.
+DCGM_FI_DEV_FB_CAPACITY_BYTES, gauge, Total framebuffer capacity in bytes.
+DCGM_FI_DEV_FB_FREE_BYTES, gauge, Free framebuffer memory in bytes.
+DCGM_FI_DEV_FB_USED_BYTES, gauge, Used framebuffer memory in bytes.
+DCGM_EXP_XID_ERRORS_TOTAL, counter, XID events observed since the exporter collector reset.

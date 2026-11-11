@@ -1,0 +1,87 @@
+services:
+  prometheus:
+    image: prom/prometheus:v3.16.0@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06
+    container_name: prometheus
+    restart: unless-stopped
+    network_mode: host
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - /opt/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - /etc/monitoring/gpu.crt:/etc/prometheus/gpu.crt:ro
+      - /var/lib/monitoring/prometheus:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --storage.tsdb.retention.size=60GB
+      - --web.listen-address=127.0.0.1:9090
+  grafana:
+    image: grafana/grafana:13.3.0@sha256:488984b716c0862639f91a698adbe2862677a5a07bad42da5f03f3030883b205
+    container_name: grafana
+    restart: unless-stopped
+    network_mode: host
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      GF_SERVER_HTTP_ADDR: 127.0.0.1
+      GF_SERVER_ROOT_URL: ${GRAFANA_URL}
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/admin_password
+      GF_SECURITY_SECRET_KEY__FILE: /run/secrets/secret_key
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_SECURITY_COOKIE_SAMESITE: strict
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_SECURITY_BRUTE_FORCE_LOGIN_PROTECTION: "true"
+      GF_UNIFIED_ALERTING_ENABLED: "false"
+      GF_SNAPSHOTS_EXTERNAL_ENABLED: "false"
+    volumes:
+      - /var/lib/monitoring/grafana:/var/lib/grafana
+      - /etc/monitoring/grafana-secrets:/run/secrets:ro
+      - /opt/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - /opt/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+  caddy:
+    image: caddy:2.11.9@sha256:0c2243efcf437ab7f7a978f1027fcf0d4f9be8a75df27b1b3fbc5dbe0ffa8cf0
+    container_name: monitoring-https
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /opt/monitoring/Caddyfile:/etc/caddy/Caddyfile:ro
+      - /etc/monitoring/streamlit-auth.caddy:/etc/monitoring/streamlit-auth.caddy:ro
+      - /var/lib/monitoring/caddy:/data
+      - /var/lib/monitoring/caddy-config:/config
+  node-exporter:
+    image: prom/node-exporter:v1.12.1@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0
+    container_name: node-exporter
+    restart: unless-stopped
+    network_mode: host
+    pid: host
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - /:/host:ro,rslave
+    command:
+      - --path.rootfs=/host
+      - --collector.disable-defaults
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --collector.cpu
+      - --collector.diskstats
+      - --collector.filesystem
+      - --collector.loadavg
+      - --collector.meminfo
+      - --collector.netdev
+      - --collector.netstat
+      - --collector.stat
+      - --collector.time
+      - --collector.uname
+      - --collector.vmstat
+      - --collector.textfile
+      - --web.listen-address=127.0.0.1:9100
+      - --collector.textfile.directory=/host/var/lib/monitoring/textfile

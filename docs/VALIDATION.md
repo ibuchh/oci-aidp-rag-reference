@@ -1,12 +1,12 @@
 # Release validation and customer acceptance
 
-## 🔹 Performed checks
+## Performed checks
 
 `VALIDATION.json` records the checks actually performed on this customer release. The source reference passed live private AIDP chat, a linked synthetic tool call/result and five native-KB/private-vLLM RAG acceptance cases; no demonstration state, credentials or evidence files are included, and this is not a customer-tenancy deployment result.
 
 Local checks include Python compilation, shell syntax, Terraform formatting/initialization/validation, mock-provider plans, controller/configuration/ownership tests, real LangGraph entry tests, RAG ownership/grounding/citation/wallet checks, Streamlit tests and release-content/integrity checks. They do not provision or destroy customer cloud resources.
 
-## ✅ Reproduce checks
+## Reproduce checks
 
 ```bash
 python3 scripts/verify-release.py
@@ -33,7 +33,7 @@ python3 scripts/validate.py \
 
 Use a locally installed supported Python interpreter explicitly when creating these environments if `python3` is too new for dependency wheels. OCI CLI uses its own Python/SDK installation for signing binary uploads; do not install application dependencies into that environment.
 
-## 🔍 Required customer live acceptance
+## Required customer live acceptance
 
 - Correct OCI identity, compartment ancestry, subscribed region and current capacity/limits.
 - Customer image cloud-init, per-instance identity, driver/DCGM and both GPUs visible inside the serving container.

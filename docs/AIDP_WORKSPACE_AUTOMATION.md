@@ -1,6 +1,6 @@
-# ⚙️ AIDP workspace, AI Compute and coded-agent automation
+# AIDP workspace, AI Compute and coded-agent automation
 
-## 🔹 Overview
+## Overview
 
 The package uses Terraform for the AIDP instance, private DNS and IAM, plus Oracle’s signed data-plane REST API for the private workspace, AI Compute, Credential Store and agent deployment. Browser uploads and manual runtime-principal configuration are unnecessary for this workflow.
 
@@ -8,7 +8,7 @@ The intended request path is OCI-authenticated AIDP agent endpoint → attached 
 
 The reference deployment passed private chat, linked synthetic tool-call/result and final-answer acceptance. The customer must repeat these checks in their own tenancy. Resource creation alone does not prove connectivity.
 
-## ✅ Preconditions / Prerequisites
+## Preconditions / Prerequisites
 
 - Run from this package with the configured API-key OCI profile and a Python-based OCI CLI installation.
 - Deploy the inference stack, monitoring/Streamlit, AIDP foundation, IAM, Lakehouse and AIDP instance first.
@@ -17,9 +17,9 @@ The reference deployment passed private chat, linked synthetic tool-call/result 
 - Use synthetic data for the POC.
 - Binary source upload uses the OCI SDK installed with the existing Python-based OCI CLI. Session-token support for this binary helper is not implemented yet.
 
-## 🛠️ Procedure
+## Procedure
 
-### 1️⃣ Prepare trust and publish the existing inference key
+### 1 Prepare trust and publish the existing inference key
 
 ```bash
 cd "$POC_ROOT"
@@ -29,7 +29,7 @@ python3 scripts/poc.py publish-key
 
 Expected: a public CA certificate and non-secret runtime configuration in `deployments/NAME/runtime`, plus metadata identifying the inference secret in Vault. The key is transferred in memory through the existing verified access path; it is not embedded in Terraform or agent source. If these files already exist for the current deployment, inspect and reuse them. Do not rotate the GPU key as a retry.
 
-### 2️⃣ Create private DNS
+### 2 Create private DNS
 
 ```bash
 python3 scripts/poc.py plan --stage aidp-dns
@@ -40,7 +40,7 @@ Expected: two resources, a private zone and A RRSet, in this VCN resolver’s de
 
 No public DNS record or public GPU endpoint is created. The controller refuses a matching private zone outside this stage’s ownership.
 
-### 3️⃣ Deploy the Credential Store Vault policy
+### 3 Deploy the Credential Store Vault policy
 
 ```bash
 python3 scripts/poc.py plan --stage aidp-credential-iam
@@ -51,7 +51,7 @@ Expected: one policy scoped to this AIDP instance, the existing inference secret
 
 The direct `runtime-iam` stage is a separate, optional resource-principal approach. The observed AI Compute identity belongs to an Oracle-managed `dataflowcomputecluster` in a service tenancy. The controller refuses to treat that identity as a verified customer-tenancy principal. Credential Store is the path validated here.
 
-### 4️⃣ Create or resume the managed runtime with one command
+### 4 Create or resume the managed runtime with one command
 
 After completing steps 1–3:
 
@@ -63,7 +63,7 @@ This performs the workspace/compute setup, credential preparation, private HTTPS
 
 The detailed phase commands below are available for inspection and recovery.
 
-### 4a️⃣ Workspace, AI Compute and coded agent
+### 4a Workspace, AI Compute and coded agent
 
 ```bash
 python3 scripts/aidp_workspace.py plan
@@ -77,7 +77,7 @@ Expected: workspace `NAME-private` uses the foundation’s exact workspace subne
 
 Compute and agent names use underscores because the service rejects hyphens in compute names. The workspace name permits hyphens.
 
-### 5️⃣ Prepare Credential Store references and run the probe
+### 5 Prepare Credential Store references and run the probe
 
 ```bash
 python3 scripts/aidp_workspace.py prepare-credential-probe
@@ -106,7 +106,7 @@ Expected in `deployments/NAME/runtime-identity.json`:
 
 The probe contains only the private URL, public CA and credential names. It reports presence of a fixed set of proxy-variable names without exposing their values. If direct transport fails and runtime proxy configuration exists, it can test that configured path with certificate verification still enabled.
 
-### 6️⃣ Publish the self-contained inference agent
+### 6 Publish the self-contained inference agent
 
 Proceed only after the private transport and Vault reference checks pass.
 
@@ -133,7 +133,7 @@ The acceptance call runs plain private chat, then the actual graph with `get_poc
 
 The agent also responds to normal user prompts. In AIDP, select the private workspace, open Agents, choose `NAME_with_underscores_agent`, and use Playground on the attached Active AI Compute. `__POC_VERIFY__` is the reserved synthetic acceptance prompt.
 
-## 🔍 Validation Steps
+## Validation Steps
 
 ```bash
 python3 scripts/aidp_workspace.py status
@@ -145,13 +145,13 @@ Check the actual workspace subnet/NSG, Active compute, matching agent `computeKe
 
 After publishing inference, use `invoke-inference` for checks. `bootstrap`, `upload-probe` and `redeploy-probe` are preparation/debugging actions, not routine inference health checks. Replacing the entry with the probe changes what the agent executes.
 
-## 🔄 Rollback
+## Rollback
 
 Read `deployments/NAME/aidp-workspace.json`. Remove its owned deployed endpoints, agent and AI Compute before removing the private workspace. Include `previous_deployments` if a redeploy generated a new key. Remove only the recorded synthetic Credential Store item and Vault-reference item. Preserve unrelated workspaces and default Master Catalog compute.
 
 These data-plane resources are separate from Terraform. After their cleanup, follow [CLEANUP.md](CLEANUP.md) for the Vault secret, scoped policy, private DNS and infrastructure. Preserve the working standalone vLLM stack when troubleshooting only AIDP.
 
-## 📚 Sources
+## Sources
 
 - [Oracle AIDP SDK and CLI](https://github.com/oracle/aidataplatform-sdk)
 - [AIDP REST endpoints](https://docs.oracle.com/en/cloud/paas/ai-data-platform/aiwap/rest-endpoints.html)

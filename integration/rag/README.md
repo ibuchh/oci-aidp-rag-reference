@@ -1,6 +1,6 @@
-# 📚 Native AIDP knowledge base with private vLLM answers
+# Native AIDP knowledge base with private vLLM answers
 
-## 🔹 Overview
+## Overview
 
 This extension targets the configured OCI deployment using the profile and region in `poc-config.json`. It ingests three fabricated Project Aster TXT documents into a native AIDP knowledge base and uses the private Qwen3-8B endpoint for answer generation.
 
@@ -8,19 +8,19 @@ Request flow: OCI-signed agent request → existing private AI Compute → nativ
 
 The native vector store is the existing AIDP-associated Lakehouse. Ingestion reuses the existing Default Master Catalog Compute. Agent execution reuses `vllm_aidp_poc_ai_compute`; the baseline `vllm_aidp_poc_agent` is separate from the new `vllm_aidp_poc_rag_agent`.
 
-### 🧭 RAG architecture
+### RAG architecture
 
 ![Native AIDP document ingestion, Lakehouse vectors and a separate RAG agent using private vLLM](../../docs/images/06-aidp-rag-architecture.png)
 
 Manual ingestion builds the searchable index. Online requests retrieve source chunks and use the existing private model to produce cited answers.
 
-### 🔁 RAG request sequence
+### RAG request sequence
 
 ![RAG agent request sequence showing retrieval, grounding, credential resolution, private model generation and citations](../../docs/images/05-aidp-rag-flow.png)
 
 Open the full-size [RAG architecture](../../docs/images/06-aidp-rag-architecture.png) or [request sequence](../../docs/images/05-aidp-rag-flow.png). Both figures are editable in the [draw.io diagram](../../diagrams/vllm-aidp-completed-architecture.drawio), using the **AIDP RAG architecture** and **AIDP RAG request flow** tabs. The images are bundled with this guide and can be opened at full size.
 
-## ✅ Preconditions / Prerequisites
+## Preconditions / Prerequisites
 
 - Existing same-tenancy stack and original `poc-config.json`, not a freshly extracted generic package.
 - AIDP Active, AI features Ready, Lakehouse available and required AIDP catalog/workspace/knowledge-base permissions.
@@ -30,7 +30,7 @@ Open the full-size [RAG architecture](../../docs/images/06-aidp-rag-architecture
 
 Schema and agent names derive from the configured POC name with hyphens replaced by underscores. The examples below use `vllm-aidp-poc`; substitute your configured name.
 
-## 🔹 Configuration and ownership
+## Configuration and ownership
 
 - Standard catalog: `default`.
 - Dedicated schema: `vllm_aidp_poc_rag`.
@@ -44,9 +44,9 @@ Schema and agent names derive from the configured POC name with hyphens replaced
 
 The public AIDP SDK used during implementation exposes schema/volume/agent APIs but no knowledge-base client operations. Native KB creation and source ingestion were performed through AIDP's UI. The code does not claim Terraform ownership of these data-plane objects. No new IAM grants or separate Spark cluster are part of this extension.
 
-## 🔹 Procedure
+## Procedure
 
-### 1️⃣ Inspect the existing extension
+### 1 Inspect the existing extension
 
 Run from the extracted `customer-vllm-aidp-poc` package root:
 
@@ -65,7 +65,7 @@ If prepare reports a pending asynchronous operation, wait for it to finish in AI
 
 For a deliberately new supported deployment, `rag_poc.py prepare --apply` creates the schema/volume with an ownership inventory and retry tokens. `rag.py upload-documents --apply` uploads the bundled TXT files, records hashes and selects the OCI CLI Python/SDK if the initial interpreter lacks OCI. Use `--documents-dir` explicitly for later approved TXT/PDF/DOCX documents. Name collisions without ownership are rejected. A timed-out create must be reconciled against its persisted intent rather than blindly adopted or recreated.
 
-### 2️⃣ Find the knowledge base in AIDP
+### 2 Find the knowledge base in AIDP
 
 Open the AIDP instance → Master catalog → `default` → `vllm_aidp_poc_rag` → Knowledge Bases → `aster_knowledge_base`.
 
@@ -73,7 +73,7 @@ In Data Source, select `synthetic_documents` → Job runs. Wait for a successful
 
 If recreating manually, create the KB with the embedding/chunk settings above, then add the entire volume `/Volumes/default/vllm_aidp_poc_rag/synthetic_documents`, select TEXT only and start ingestion. Wait for successful completion before testing. Use the plus button beside the Data Source filter to add the volume. AIDP takes a volume/folder as the source rather than individual files. Re-ingest changed sources explicitly; this POC adds no scheduled ingestion.
 
-### 3️⃣ Connect the separate RAG agent
+### 3 Connect the separate RAG agent
 
 After the native KB exists and ingestion succeeds, record its identity and publish the isolated agent:
 
@@ -84,7 +84,7 @@ python3 integration/rag/rag.py connect --apply
 
 Expected: the endpoint becomes ACTIVE and all five sample acceptance checks pass. These commands require the existing deployed stack and its workspace inventory.
 
-### 4️⃣ Ask a question through the deployed RAG endpoint
+### 4 Ask a question through the deployed RAG endpoint
 
 ```bash
 python3 integration/rag/rag_poc.py invoke \
@@ -104,7 +104,7 @@ In AIDP's private workspace, open agent `vllm_aidp_poc_rag_agent` to review the 
 
 The existing Streamlit app still calls vLLM directly. It has not been changed into a RAG client by creating this knowledge base.
 
-### 5️⃣ Manually update documents
+### 5 Manually update documents
 
 For later use, upload TXT, PDF or DOCX files from a directory you select:
 
@@ -116,7 +116,7 @@ python3 integration/rag/rag.py upload-documents \
 
 The script skips unchanged file hashes and overwrites changed owned filenames. It does not remove old files or start ingestion. In AIDP open the KB source → Parameters → Ingest now, then wait for Job runs → Succeeded. New source folders or file types must also be selected in the native source configuration. The included acceptance suite checks the synthetic Aster facts; supply your own expected facts when replacing them.
 
-### 6️⃣ Publish deliberate agent-code updates
+### 6 Publish deliberate agent-code updates
 
 ```bash
 python3 integration/rag/rag.py record-kb --apply
@@ -125,7 +125,7 @@ python3 integration/rag/rag.py connect --apply
 
 Do not republish for routine questions. Publishing can create a new deployment version; the inventory preserves the old version IDs for cleanup. Generated source contains public trust and credential identifiers, never the bearer key or database password. Keep it with the account-specific deployment records rather than distributing it as generic customer source.
 
-## 🔍 Validation Steps
+## Validation Steps
 
 Validated in Ashburn on 2026-11-11: native ingestion succeeded with 3 files added, 0 modified and 0 deleted. All five deployed endpoint acceptance cases passed. The included RAG unit suite passes 12 tests, covering ownership reconciliation, grounded generation, citations and private wallet cleanup.
 
@@ -154,7 +154,7 @@ Local tests require the baseline agent dependencies, including LangGraph:
 python3 -m unittest discover -s integration/rag/tests -v
 ```
 
-## 🔄 Rollback and teardown
+## Rollback and teardown
 
 Use [CLEANUP.md](../../docs/CLEANUP.md) step **2a** for RAG-only removal: undeploy every RAG endpoint version, detach its Playground test runtime/agent, stop ingestion, remove the KB source/vectors and KB, then remove owned original files/volume, the empty dedicated schema and the exact RAG code folder. Confirm ownership from `rag/inventory.json` and preserve its evidence.
 

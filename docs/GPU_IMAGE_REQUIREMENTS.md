@@ -1,6 +1,6 @@
 # GPU image requirements
 
-## ✅ Customer GPU image contract
+## Customer GPU image contract
 
 Supply a sanitized Ubuntu 22.04 GPU image with:
 

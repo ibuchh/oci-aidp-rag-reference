@@ -212,5 +212,12 @@
     "scope": "All customer and published Markdown guides; source copies updated to prevent reintroduction.",
     "deployment_code_unchanged": true,
     "cloud_commands_executed": false
+  },
+  "documentation_heading_style": {
+    "updated_utc": "2026-11-11T16:58:50.480287+00:00",
+    "change": "Removed decorative emoji from Markdown headings; keycap step numbers converted to plain digits.",
+    "scope": "All customer and published Markdown guides, including source copies.",
+    "deployment_code_unchanged": true,
+    "cloud_commands_executed": false
   }
 }

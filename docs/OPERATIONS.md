@@ -1,16 +1,16 @@
 # Inference, monitoring and Streamlit operations
 
-## 🔹 Overview
+## Overview
 
 Run commands from the package root on the Mac. `scripts/node.py` reads `poc-config.json`, opens temporary Bastion sessions, checks SSH host fingerprints against OCI console evidence, runs the selected check and closes its sessions. No inference API key needs to be copied into a terminal.
 
-## ✅ Preconditions / Prerequisites
+## Preconditions / Prerequisites
 
 Complete the inference deployment, confirm the current Bastion allowlist, and retain the configured SSH key and state directory. Public Grafana and Streamlit URLs are printed by deployment and stored in the protected login files described in the README.
 
-## 🔹 Procedure
+## Procedure
 
-### 1️⃣ Validate hosts
+### 1 Validate hosts
 
 ```bash
 python3 scripts/node.py gpu-health
@@ -19,7 +19,7 @@ python3 scripts/node.py monitoring-health
 
 Expected: two NVIDIA A10 GPUs, active vLLM/Nginx, a mounted model filesystem, healthy Prometheus targets and passing dashboard query checks. The monitoring validator runs against the rendered configuration on the VM, not the source files containing replacement markers.
 
-### 2️⃣ Send one inference request
+### 2 Send one inference request
 
 ```bash
 python3 scripts/node.py chat
@@ -35,7 +35,7 @@ python3 scripts/node.py tool-test
 
 Expected: `PASS` and `tool_observed: true`. A model answer alone is insufficient; the client requires a real allowed tool call and the follow-up response.
 
-### 3️⃣ Use the public chat UI
+### 3 Use the public chat UI
 
 Open the URL in `states/.pocctl/streamlit-login.json`, authenticate with its username/password, and enter a synthetic prompt. The UI supports a system prompt, model selection, temperature, output-token limit, top-p, penalties, stop sequences, streaming and timeout. Review the redacted request/response inspector as needed.
 
@@ -43,7 +43,7 @@ The app retains conversation data in session memory, with optional manual export
 
 Separate visitors authenticate with the shared POC browser login but receive separate Streamlit sessions. This is POC authentication, without a corporate identity lifecycle or per-user authorization model.
 
-### 4️⃣ Generate dashboard traffic
+### 4 Generate dashboard traffic
 
 Keep Grafana open, choose **Last 15 minutes** and a refresh interval such as 5 seconds. On the Mac:
 
@@ -56,7 +56,7 @@ The load driver runs on the monitoring VM, apart from the inference process. It 
 
 Results are saved on the monitoring VM under `/var/lib/monitoring/load-tests/UTC_TIMESTAMP`. `Ctrl+C` stops the foreground SSH command and triggers tunnel cleanup; check for a surviving remote load process if the network disconnects unexpectedly before starting another test.
 
-### 5️⃣ Read the dashboards
+### 5 Read the dashboards
 
 - **Inference traffic:** successful requests, request failures, prompt/output token rates and aggregate throughput.
 - **Responsiveness:** time to first token, inter-token latency and request duration. Queued load can increase waiting time even when utilization is high.
@@ -67,7 +67,7 @@ Results are saved on the monitoring VM under `/var/lib/monitoring/load-tests/UTC
 
 Two 24 GiB GPUs provide distributed capacity; they do not form one automatically pooled GPU and do not guarantee twice the speed. The serving baseline explicitly uses tensor parallelism across both devices.
 
-### 6️⃣ Reinstall or repair the public app
+### 6 Reinstall or repair the public app
 
 After fixing a failed app build, proxy configuration or certificate issuance prerequisite:
 
@@ -87,10 +87,10 @@ cd apps/streamlit
 
 This uses the same inference stack through Bastion and opens a local Streamlit server. The primary deployment remains the authenticated public app on the monitoring VM.
 
-## 🔍 Validation Steps
+## Validation Steps
 
 Run `gpu-health`, `monitoring-health`, `chat` and `tool-test`; open both public URLs; verify a browser session can chat and an unauthenticated request cannot open Streamlit. During load, confirm request/token metrics and both GPU series change. During AIDP testing, additionally verify actual requests from its private managed runtime.
 
-## 🔄 Rollback
+## Rollback
 
 Stop synthetic traffic first. A failed Streamlit installation leaves inference/monitoring infrastructure available for repair. Before tearing down the stack, follow [CLEANUP.md](CLEANUP.md), including AIDP dependencies and recorded secrets.

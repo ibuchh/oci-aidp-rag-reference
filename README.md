@@ -1,6 +1,6 @@
 # OCI AIDP RAG Reference
 
-## 🔹 Overview
+## Overview
 
 Reference implementation for deploying, validating, operating and removing private vLLM inference and native RAG with Oracle AI Data Platform (AIDP) in your own OCI tenancy. It includes Terraform, host bootstrap, monitoring, Streamlit and signed API automation for AIDP's private workspace, AI Compute, baseline coded agent and an optional native knowledge-base RAG agent. The customer owns execution, credentials, resource approvals, state, data and cleanup.
 
@@ -42,7 +42,7 @@ Start with these guides:
 - [VALIDATION.md](docs/VALIDATION.md) — release-local checks and required customer acceptance.
 - [Architecture](diagrams/vllm-aidp-completed-architecture.drawio) — editable reference topology and agent request flow.
 
-## ✅ What is included
+## What is included
 
 - `terraform/`: independent roots for shared networking/FSS, monitoring, GPU VM, AIDP foundation, service IAM, Lakehouse, AIDP, private DNS and Credential Store IAM. The direct-runtime IAM root is optional and is not used by the supported Credential Store flow.
 - `scripts/`: account discovery, guarded plan/apply/destroy, host configuration, runtime publication and AIDP data-plane automation.
@@ -55,7 +55,7 @@ Start with these guides:
 
 Credentials, populated account configuration, deployment inventories, state, API signing/SSH keys, passwords, real certificates, model weights and the GPU image are excluded. No access to the demonstration tenancy is required.
 
-## 🔹 Automation boundaries
+## Automation boundaries
 
 Terraform provisions the infrastructure and policies. The pinned provider does not expose the workspace/AI Compute/agent resources used here; `aidp_workspace.py` creates them through signed public OCI requests and records separate ownership. The deployment is guided, with explicit plan/apply confirmations.
 

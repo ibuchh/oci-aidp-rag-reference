@@ -1,6 +1,6 @@
 # Customer configuration
 
-## 🔹 Account inputs
+## Account inputs
 
 Run `./setup.sh` to produce `poc-config.json`. No fields from the demonstration account are prepopulated. The wizard reads profile names, tenancy ID and default region from your local OCI configuration; it never copies API signing credentials into JSON.
 
@@ -18,7 +18,7 @@ Run `./setup.sh` to produce `poc-config.json`. No fields from the demonstration 
 - `name`: resource/state namespace. Default `vllm-aidp-poc` gives agent `vllm_aidp_poc_agent`.
 - `state_directory`: `deployments/NAME/states`, isolated from other POCs. Do not retarget existing state.
 
-## 🔹 Fixed reference baseline
+## Fixed reference baseline
 
 The supplied stack serves one pinned Qwen3-8B revision using vLLM 0.11.0, FP16, TP=2, context 4096, up to four scheduled sequences and Hermes tool calling. The GPU shape is `VM.GPU.A10.2`. Changing model family/repo is not just a JSON field change; update serving templates and rerun tool/quality/performance acceptance.
 
@@ -30,7 +30,7 @@ Leave `runtime_principal_type` and `runtime_principal_id` null. Use the scoped A
 
 `bootstrap_timeout_seconds` is 3600. It bounds controller waiting, not resource lifetime or a service provisioning guarantee.
 
-## 🔹 Network and access
+## Network and access
 
 Subnet offsets within the selected `/16` are 32 for Bastion, 33 for GPU, 34 for FSS, 35 for monitoring and 36 for AIDP/Lakehouse. The AIDP subnet and customer VCN resolver enable private model access. Private inference uses `https://inference.lab/v1/chat/completions` with bearer authentication and an explicitly trusted certificate.
 
@@ -40,7 +40,7 @@ With `grafana_hostname: null`, Grafana and Streamlit use generated sslip.io name
 
 If using a custom Grafana hostname, configure it before apply and point both that hostname and its `streamlit.` hostname to the new monitoring public IP. A private-only browser access variant requires a reviewed source/network change; the supplied setup does not silently select one.
 
-## 🔹 State and administrator roles
+## State and administrator roles
 
 Each Terraform root has independent local state under the configured deployment directory. The controller creates protected local backend overrides and reviewed run directories. Do not run separate applies in source roots; that would create another state lineage. The customer is responsible for protected state backups and coordinating concurrent operators. Remote-state migration is not automated by this package.
 
@@ -48,6 +48,6 @@ The AIDP data-plane inventory is outside Terraform in `deployments/NAME/aidp-wor
 
 Read [IAM.md](IAM.md) for service policies, scoped Credential Store access, administrator ownership and teardown roles.
 
-## 🔹 Optional native AIDP RAG
+## Optional native AIDP RAG
 
 The RAG scripts reuse the configured name/profile/region and existing workspace inventory. Schema and agent names use the POC name with hyphens replaced by underscores. KB, managed-volume, embedding and chunk settings are documented in [RAG_KNOWLEDGE_BASE.md](RAG_KNOWLEDGE_BASE.md); they are not additional `poc-config.json` fields. Do not invent new configuration keys. Native KB creation and ingestion are UI operations, and original documents require separate backup and retention decisions.

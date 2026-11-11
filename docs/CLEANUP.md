@@ -1,12 +1,12 @@
-# 🧹 Customer teardown — complete POC
+# Customer teardown — complete POC
 
-## 🔹 Overview
+## Overview
 
 Cleanup permanently deletes the POC's VMs/disks, FSS/model files, monitoring data, Lakehouse data, native knowledge-base vectors, uploaded RAG documents, AIDP, policies and networking. The controller operates on recorded ownership, not a compartment-wide name scan. Imported images, the pre-existing compartment/operator identities and unrelated resources remain.
 
 There are three phases: explicit RAG and baseline AIDP data-plane cleanup, inference-secret deletion scheduling, then guarded Terraform destruction. Vault/key/secret retention and service-managed storage need a final check after apply. No command in this document has been executed in the customer's tenancy as part of handover preparation.
 
-## ✅ Preconditions / Prerequisites
+## Preconditions / Prerequisites
 
 - Stop traffic and load tests. Export anything that must survive, including remote FSS, metrics and database data.
 - Preserve the same source, populated config, states, `.pocctl` inventory, `aidp-workspace.json` and `rag/inventory.json` used for deployment. Include RAG earlier deployment versions, native source/ingestion job IDs and any manually created resources.
@@ -14,9 +14,9 @@ There are three phases: explicit RAG and baseline AIDP data-plane cleanup, infer
 - Use a customer identity authorized to delete the complete POC, including IAM policies. See [IAM.md](IAM.md) for split roles.
 - Keep the same account, region, POC name and state directory. Do not remove state files or ownership records to bypass a failed deletion.
 
-## 🔹 Procedure
+## Procedure
 
-### 1️⃣ Inventory and preserve evidence
+### 1 Inventory and preserve evidence
 
 From the extracted source package:
 
@@ -43,13 +43,13 @@ tar -czf "$BACKUP_DIR/deployment-records.tgz" "$DEPLOYMENT_DIR"
 
 Expected: local destroy plans and recorded boot-volume IDs are displayed, with no cloud deletion. These Terraform plans do not include the native KB, RAG files, data-plane agents or managed workspaces; reconcile their inventories separately before apply. Review them. This archive contains deployment evidence and possibly passwords/sensitive state; keep it private. It does not back up remote model, metrics or database data.
 
-### 2️⃣ Remove RAG and baseline AIDP runtime resources explicitly
+### 2 Remove RAG and baseline AIDP runtime resources explicitly
 
 Open the exact AIDP instance recorded in the deployment. Read both `deployments/NAME/aidp-workspace.json` and, if RAG was prepared, `deployments/NAME/rag/inventory.json`. Use resource IDs, `resources`, `previous_deployments`, accepted create intents and entry-file paths to establish ownership; names alone are insufficient. If an inventory is missing or a create was interrupted, reconcile the exact resources with the administrator before deletion. A missing local inventory does not establish that RAG is absent.
 
 For default name `vllm-aidp-poc`, the names below use `vllm_aidp_poc`. Substitute your configured name with hyphens converted to underscores for schema and agent names.
 
-#### 2a️⃣ Remove only the RAG extension first
+#### 2a Remove only the RAG extension first
 
 Perform these steps whenever RAG was created, including before a whole-stack teardown:
 
@@ -70,7 +70,7 @@ python3 scripts/aidp_workspace.py invoke-inference \
 
 Expected: baseline chat/tool acceptance still passes. Do not schedule secret deletion or run destructive Terraform commands for RAG-only removal.
 
-#### 2b️⃣ Continue with baseline resources for a whole-stack teardown
+#### 2b Continue with baseline resources for a whole-stack teardown
 
 1. In `vllm-aidp-poc-private`, undeploy the endpoint for `vllm_aidp_poc_agent` and every remaining owned earlier version. Detach its Playground test runtime and agent compute attachment, then delete the agent.
 2. Delete `vllm_aidp_poc_ai_compute` only after both baseline and RAG agents are detached, and wait for completion.
@@ -82,7 +82,7 @@ Leave the Terraform-managed AIDP instance and Lakehouse for step 4. The `--confi
 
 Oracle procedures: [AI Compute](https://docs.oracle.com/en/cloud/paas/ai-data-platform/aidug/ai-compute.html), [Workspaces](https://docs.oracle.com/en/cloud/paas/ai-data-platform/aidug/workspaces.html), [Credential Store](https://docs.oracle.com/en/cloud/paas/ai-data-platform/aidug/credential-store.html).
 
-### 3️⃣ Schedule the separately recorded inference secret for deletion
+### 3 Schedule the separately recorded inference secret for deletion
 
 Skip only if `publish-key` was never run and there is no inference-secret record or interrupted create intent. Otherwise extract non-secret metadata:
 
@@ -135,7 +135,7 @@ Expected: `PENDING_DELETION`. The secret becomes unavailable immediately; perman
 
 If a create intent exists without a secret record, reconcile the exact name/Vault/compartment through metadata with the customer administrator. Do not retrieve secret contents or adopt an unrelated secret as a shortcut. Resolve permission/not-found ambiguity before continuing.
 
-### 4️⃣ Apply infrastructure destruction
+### 4 Apply infrastructure destruction
 
 ```bash
 ./destroy.sh \
@@ -152,7 +152,7 @@ Each component creates a fresh plan for review and asks for confirmation. Source
 
 Vault/key/secret deletion can remain pending after Terraform finishes. Record the actual deadline instead of declaring them physically deleted. [Oracle Vault deletion](https://docs.oracle.com/en-us/iaas/Content/KeyManagement/Tasks/managingvaults_topic-To_delete_a_vault.htm).
 
-## 🔍 Validation Steps
+## Validation Steps
 
 ```bash
 python3 scripts/poc.py status --config "$CONFIG"
@@ -170,6 +170,6 @@ Expected: zero managed resource records in the package's deployed roots, unless 
 
 Public apps and inference must stop serving. An empty state alone does not prove untracked/manual resources or retained backups were deleted. Retention can require a later customer follow-up.
 
-## 🔄 Rollback
+## Rollback
 
 Cancel before apply to leave resources intact. After deletion starts, restore from actual retained backups/images where supported. Recreating Terraform resources does not restore deleted model, metrics, database or original document data. Rebuild a removed RAG KB only from backed-up originals, re-ingest them and rerun acceptance; embeddings, hashes and acceptance reports are not source-document backups. RAG-only rollback must leave baseline dependencies intact. Pending secret deletion can be canceled through OCI before its deadline if the customer deliberately chooses recovery.

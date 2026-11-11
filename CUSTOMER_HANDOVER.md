@@ -73,7 +73,7 @@ For later documents, use the upload and manual **Ingest now** steps in the RAG g
 
 Follow [CLEANUP.md](docs/CLEANUP.md) in order. Retain your generated configuration, state and ownership inventories until cleanup verification is complete.
 
-Terraform owns infrastructure and policies. Signed API scripts create the AIDP workspace, AI Compute and coded agent. This release requires explicit AIDP Console runtime, RAG knowledge-base/vector and managed-document cleanup before guarded infrastructure destruction; teardown is not fully unattended.
+Terraform owns infrastructure and policies. Signed API scripts create the AIDP workspace, AI Compute and coded agent. For automated whole-stack teardown, use `destroy.sh --include-runtime` as described in the cleanup guide. It verifies a local controller backup, removes owned runtime/RAG resources and schedules secret deletion before infrastructure destruction. Remote data exports and final retention checks remain separate. The manual alternative supports RAG-only removal.
 
 ## Validation Steps
 

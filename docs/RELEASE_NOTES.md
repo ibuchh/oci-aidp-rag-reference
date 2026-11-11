@@ -24,3 +24,7 @@ endpoint acceptance and prints the required UI chat check. The new
 changing cloud resources. A normal published endpoint response is never treated
 as proof of Playground chat. The workspace guide includes the verified procedure
 for refreshing a stale probe test copy on the same existing compute.
+
+## Automated full cleanup — November 11, 2026
+
+`destroy.sh --include-runtime` adds GET-only runtime discovery, automatic verified local controller backups, inventory-scoped AIDP/RAG removal, inference-secret scheduling and resumable progress before Terraform destruction. Dedicated RAG schemas use documented cascade deletion. Additional workspaces require an explicitly reviewed key. Unrecorded resources, unresolved creates, permission failures and incomplete asynchronous operations stop later phases. Existing manual cleanup remains available. Remote data exports and retention verification are separate. Live destructive acceptance remains to be performed.

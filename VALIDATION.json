@@ -240,5 +240,51 @@
     "controller_tests_passed": 87,
     "offline_terraform_regression": "Generated destroy override initializes, validates and plans for all seven AIDP stage names using terraform_data fixtures; protected lifecycle overrides and canonical source protection verified.",
     "cloud_resources_changed": false
+  },
+  "automated_cleanup": {
+    "verified_utc": "2026-11-11T18:02:26.997788+00:00",
+    "status": "PASS",
+    "controller_tests_passed": 111,
+    "cleanup_tests_added": 24,
+    "new_flags": [
+      "--include-runtime",
+      "--additional-workspace",
+      "--cleanup-wait-minutes"
+    ],
+    "local_checks": [
+      "GET-only full preview",
+      "Dependency ordering and Playground detachment request",
+      "Unknown-resource and ownership rejection",
+      "Explicit extra workspace selection",
+      "Verified private local source/config/state backups",
+      "Backup failure and confirmation cancellation stop deletion",
+      "Interrupted delete and asynchronous operation reconciliation",
+      "Secret identity and Vault checks; preserve pending deadlines",
+      "Runtime failure blocks secret scheduling and Terraform apply",
+      "Noninteractive CLI preview/apply guards",
+      "Permanent handover prepare includes new source"
+    ],
+    "live_read_only_checks": {
+      "runtime_operations_previewed": 13,
+      "secret_identity_and_vault_verified": true,
+      "404_parent_listing_reconciliation_verified": true
+    },
+    "limitations": [
+      "No mutating AIDP/RAG cleanup API or live destroy was executed during implementation.",
+      "Actual Playground detachment, schema cascade and service dependencies require live destructive acceptance.",
+      "Remote data exports and service-managed retention/backups remain separate."
+    ],
+    "cloud_resources_created": false,
+    "cloud_resources_deleted": false,
+    "document_checks": {
+      "handoff/full-stack/20261111T154344Z/customer-vllm-aidp-poc": {
+        "local_document_links": 69,
+        "document_shell_blocks": 73
+      },
+      "handoff/github/oci-aidp-rag-reference": {
+        "local_document_links": 73,
+        "document_shell_blocks": 74
+      }
+    }
   }
 }

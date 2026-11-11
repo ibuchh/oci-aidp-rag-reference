@@ -4,7 +4,7 @@
 
 Cleanup permanently deletes the POC's VMs/disks, FSS/model files, monitoring data, Lakehouse data, native knowledge-base vectors, uploaded RAG documents, AIDP, policies and networking. The controller operates on recorded ownership, not a compartment-wide name scan. Imported images, the pre-existing compartment/operator identities and unrelated resources remain.
 
-There are three phases: explicit RAG and baseline AIDP data-plane cleanup, inference-secret deletion scheduling, then guarded Terraform destruction. Vault/key/secret retention and service-managed storage need a final check after apply. No command in this document has been executed in the customer's tenancy as part of handover preparation.
+Both workflows perform RAG and baseline AIDP data-plane cleanup, inference-secret deletion scheduling, then guarded Terraform destruction. Automated full cleanup also creates and verifies the local controller backup. Vault/key/secret retention and service-managed storage need a final check after apply. No command in this document has been executed in the customer's tenancy as part of handover preparation.
 
 ## Preconditions / Prerequisites
 
@@ -14,7 +14,78 @@ There are three phases: explicit RAG and baseline AIDP data-plane cleanup, infer
 - Use a customer identity authorized to delete the complete POC, including IAM policies. See [IAM.md](IAM.md) for split roles.
 - Keep the same account, region, POC name and state directory. Do not remove state files or ownership records to bypass a failed deletion.
 
-## Procedure
+## Automated full cleanup
+
+For a whole-stack teardown, use `--include-runtime` to automate the local backup, AIDP/RAG runtime removal and inference-secret scheduling before Terraform destruction. Choose this workflow or the manual alternative below. RAG-only removal still uses manual step 2a.
+
+Use the same complete deployment folder, populated configuration and ownership inventories. The cleanup identity needs AIDP workspace/agent/compute/credential deletion permissions, ADMIN access to the dedicated RAG schema/volume, inference-secret deletion scheduling and the documented Terraform/IAM deletion rights. Missing ownership, unresolved create intents, API authorization failures and unexpected resources stop automated apply.
+
+### 1. Preview the complete scope
+
+```bash
+CONFIG=poc-config.json
+POC_NAME=$(python3 -c \
+  'import json,sys; print(json.load(open(sys.argv[1]))["name"])' \
+  "$CONFIG")
+
+./destroy.sh \
+  --config "$CONFIG" \
+  --plan \
+  --include-runtime
+```
+
+Expected: an AIDP/RAG cleanup inventory, any blockers, a proposed secret-deletion schedule and the Terraform destroy plans. Preview sends no mutating AIDP requests, schedules no secret deletion and applies no Terraform changes. Reports are private files under `deployments/NAME/cleanup/`.
+
+The scope includes all endpoint versions discovered under the exact recorded agents, Playground compute detachment, those agents, recorded document files, a cascading deletion of the owned dedicated RAG schema, recorded Credential Store entries, the shared owned AI Compute and private workspace. The schema cascade includes every child object in that dedicated namespace, including the native KB, indexed vectors and managed document volume; it never targets the entire default catalog. An unrecorded file/folder, agent, compute, job or credential blocks automatic deletion. The instance's named default workspace stays until Terraform removes the AIDP instance.
+
+An additional workspace is never adopted by display name. Review its key and contents, then explicitly select it in both preview and apply:
+
+```bash
+EXTRA_WORKSPACE_KEY=REPLACE_WITH_REVIEWED_WORKSPACE_KEY
+
+./destroy.sh \
+  --config "$CONFIG" \
+  --plan \
+  --include-runtime \
+  --additional-workspace "$EXTRA_WORKSPACE_KEY"
+```
+
+Repeat `--additional-workspace` for each approved workspace. This selects that entire workspace, including all contained files, jobs and compute. A missing or unknown key blocks apply. Do not select shared or unrelated workspaces.
+
+### 2. Apply the reviewed cleanup
+
+After the complete preview has no blockers:
+
+```bash
+./destroy.sh \
+  --config "$CONFIG" \
+  --apply \
+  --include-runtime \
+  --delete-data \
+  --confirm-name "$POC_NAME"
+```
+
+Include the same `--additional-workspace "$EXTRA_WORKSPACE_KEY"` option when additional workspaces were approved. Do not add `--confirm-aidp-runtime-removed` to automated cleanup; the script verifies runtime removal itself. It asks for `DELETE NAME INCLUDING RUNTIME` and the existing per-component confirmations. For a previously reviewed noninteractive run, append `--yes`; the matching `--confirm-name` and `--delete-data` remain mandatory.
+
+The apply sequence is:
+
+1. Recheck the target and ownership, and generate all infrastructure destroy previews before any deletion.
+2. Create and verify a private local archive of the supplied configuration, source files, Terraform states and deployment inventories under `.local/cleanup-backups/TIMESTAMP/`. The archive and checksum manifest contain sensitive information and must stay private. Provider caches and symlinks are excluded.
+3. Remove endpoint versions, detach Playground compute and remove owned agents. Delete recorded RAG originals, then cascade-delete only the owned dedicated RAG schema and verify its disappearance. Remove the recorded credentials, compute and private workspace. Remove only explicitly selected additional workspaces after RAG cleanup, keeping their ingestion compute available until then.
+4. Verify the recorded runtime scope is empty, then schedule an Active inference secret for deletion with an eight-day delay. An already pending deletion keeps its original deadline. Metadata identity, compartment and Vault must match; no secret contents are retrieved.
+5. Apply newly reviewed Terraform destroy plans in dependency order and delete the recorded retained boot volumes.
+
+**The automatic archive contains local controller files, not remote FSS/model data, database contents, Grafana history or uploaded document originals.** Export remote data separately before applying if it must survive. `--delete-data` explicitly approves losing that remote data. Keep the imported GPU image for rebuilding.
+
+Progress is recorded under `deployments/NAME/cleanup/journal.json`. Accepted asynchronous operations are polled and recorded. If a request, permission check, dependency removal or wait fails, later phases stop. Rerun the same command with the same configuration and inventories to resume. `--cleanup-wait-minutes 60` extends the per-operation wait from its default 30 minutes. Never erase state or the journal to bypass a failure.
+
+A failed runtime cleanup prevents inference-secret scheduling and infrastructure apply. A failed backup prevents all automated deletions. Authentication/authorization failures are not treated as missing resources; an HTTP 404 requires a successful parent listing to establish absence. Service dependency conflicts or unsupported API behavior stop cleanup instead of bypassing runtime verification.
+
+After apply, require `runtime_verified: true` and `infrastructure_completed: true` in the journal, then complete the service-side validation at the end of this guide. Vault retention deadlines, external data and pre-existing backups can remain; a successful API request does not certify their physical deletion.
+
+Oracle API references: [schema cascade deletion](https://docs.oracle.com/en/cloud/paas/ai-data-platform/aiwap/op-aidataplatforms-aidataplatformid-schemas-schemakey-delete.html), [AIDP REST endpoints](https://docs.oracle.com/en/cloud/paas/ai-data-platform/aiwap/rest-endpoints.html).
+
+## Manual cleanup alternative
 
 ### 1. Inventory and preserve evidence
 
@@ -78,7 +149,7 @@ Expected: baseline chat/tool acceptance still passes. Do not schedule secret del
 4. Remove the owned uploaded code folders recorded by the baseline inventory. Delete the owned private workspace after its dependencies are gone.
 5. Inspect other POC-owned ingestion jobs, workspaces, Master Catalog/Spark compute, managed data, buckets, objects, attachments and retention settings. Remove these through supported service cleanup only after their consumers are gone. Do not assume deleting the AIDP instance purges retained storage or unrelated assets.
 
-Leave the Terraform-managed AIDP instance and Lakehouse for step 4. The `--confirm-aidp-runtime-removed` flag is the operator's acknowledgment, not an automatic RAG/KB dependency check. Set it only after the full recorded data-plane inventory has been reconciled. Neither `aidp_workspace.py` nor `rag.py` provides an automatic destroy command in this release.
+Leave the Terraform-managed AIDP instance and Lakehouse for step 4. The `--confirm-aidp-runtime-removed` flag is the operator's acknowledgment, not an automatic RAG/KB dependency check. Set it only after the full recorded data-plane inventory has been reconciled. For automated whole-stack teardown, use `destroy.sh --include-runtime` above instead of these manual steps. `aidp_workspace.py` and `rag.py` do not expose standalone destroy actions.
 
 Oracle procedures: [AI Compute](https://docs.oracle.com/en/cloud/paas/ai-data-platform/aidug/ai-compute.html), [Workspaces](https://docs.oracle.com/en/cloud/paas/ai-data-platform/aidug/workspaces.html), [Credential Store](https://docs.oracle.com/en/cloud/paas/ai-data-platform/aidug/credential-store.html).
 

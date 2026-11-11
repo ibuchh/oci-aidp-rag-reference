@@ -282,4 +282,4 @@ This reads service metadata and updates the local inventory; it does not certify
 
 ## Rollback
 
-Successful phases remain available for diagnosis. If the customer elects to remove the stack, use [CLEANUP.md](CLEANUP.md), including its explicit AIDP runtime and retention steps. Do not erase state or manually remove lifecycle protections to force an apply.
+Successful phases remain available for diagnosis. If the customer elects to remove the stack, use [CLEANUP.md](CLEANUP.md), using automated `--include-runtime` cleanup or its manual alternative, followed by retention verification. Do not erase state or manually remove lifecycle protections to force an apply.

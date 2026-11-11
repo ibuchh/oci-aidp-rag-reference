@@ -283,10 +283,17 @@ def inference(cfg, *, apply, destroy=False, args=None):
     private_json(path,{k:v for k,v in cfg.items() if k not in EXTRA})
     argv=[sys.executable,str(ROOT/'scripts/inference_stack.py'),'destroy' if destroy else 'deploy','--config',str(path)]
     if apply:argv.append('--apply')
-    if args.yes:argv.append('--yes')
+    if args.yes and apply:argv.append('--yes')
     if destroy and apply:argv+=['--delete-data','--confirm-name',cfg['name']]
     if not destroy and args.infra_only:argv.append('--infra-only')
     subprocess.run(argv,check=True)
+
+
+def destroy_infrastructure(cfg, args, *, apply):
+    for stage in reversed(AIDP_STAGES):
+        if managed(state(Path(cfg['state_directory'])/stage/'terraform.tfstate')):
+            tf_stage(cfg,stage,apply=apply,destroy=True,yes=args.yes)
+    inference(cfg,apply=apply,destroy=True,args=args)
 
 
 def main(argv=None):
@@ -304,10 +311,26 @@ def main(argv=None):
     parser.add_argument('--delete-data',action='store_true')
     parser.add_argument('--confirm-name')
     parser.add_argument('--confirm-aidp-runtime-removed',action='store_true')
+    parser.add_argument('--include-runtime',action='store_true',
+                        help='Automate verified local backup, owned AIDP/RAG cleanup and inference-secret scheduling')
+    parser.add_argument('--additional-workspace',action='append',default=[],metavar='KEY',
+                        help='Explicitly include an additional workspace and ALL its contents; repeat for each reviewed key')
+    parser.add_argument('--cleanup-wait-minutes',type=int,default=30,
+                        help='Maximum wait per AIDP cleanup operation, 1 to 180 minutes (default: 30)')
     parser.add_argument('--ack-aidp-bootstrap-limit',action='store_true')
     args=parser.parse_args(argv)
     if args.plan and args.action!='destroy':
         parser.error('--plan is only supported for destroy; use the plan action for a component plan')
+    if args.include_runtime and args.action!='destroy':
+        parser.error('--include-runtime is only supported for destroy')
+    if args.additional_workspace and not args.include_runtime:
+        parser.error('--additional-workspace requires --include-runtime')
+    if args.include_runtime and args.confirm_aidp_runtime_removed:
+        parser.error('Choose automated --include-runtime or the manual runtime-removal acknowledgment')
+    if not 1<=args.cleanup_wait_minutes<=180:
+        parser.error('--cleanup-wait-minutes must be between 1 and 180')
+    if args.include_runtime and args.yes and not args.apply:
+        parser.error('--yes requires --apply for automated cleanup')
     os.umask(0o077)
     if args.action=='configure':return configure(args)
     if args.action in ('plan','apply') and not args.stage:parser.error('--stage is required')
@@ -355,6 +378,12 @@ def main(argv=None):
             prepare(cfg,publish=args.action=='publish-key')
         elif args.action=='destroy':
             if args.apply and args.confirm_name!=cfg['name']:raise PocError('Confirmation name does not match.')
+            if args.include_runtime:
+                from cleanup import automated_destroy
+                automated_destroy(cfg,args,
+                    preview_infrastructure=lambda:destroy_infrastructure(cfg,args,apply=False),
+                    apply_infrastructure=lambda:destroy_infrastructure(cfg,args,apply=True))
+                return
             if args.apply and not args.confirm_aidp_runtime_removed:
                 raise PocError('Remove AIDP agents/AI Compute/workspace dependencies first; then use --confirm-aidp-runtime-removed.')
             runtime_record=states.parent/'runtime/inference-secret.json'
@@ -365,10 +394,7 @@ def main(argv=None):
                     if args.apply:
                         raise PocError('Schedule recorded inference secret deletion first. See docs/CLEANUP.md. No deletion started.')
                     print('Recorded inference secret is active. Preview continues; schedule its deletion before destructive apply.')
-            for stage in reversed(AIDP_STAGES):
-                if managed(state(states/stage/'terraform.tfstate')):
-                    tf_stage(cfg,stage,apply=args.apply,destroy=True,yes=args.yes)
-            inference(cfg,apply=args.apply,destroy=True,args=args)
+            destroy_infrastructure(cfg,args,apply=args.apply)
 
 
 if __name__=='__main__':

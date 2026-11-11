@@ -6,4 +6,4 @@ The supported model path uses an AIDP Credential Store Vault reference, exact-in
 
 Do not populate direct-runtime principal fields from a managed compute token. After prerequisites, `python3 scripts/aidp_workspace.py connect --wait-minutes 30` creates/resumes and verifies the coded-agent path. Use `invoke-inference` for routine acceptance afterward.
 
-Preserve both Terraform state and `aidp-workspace.json`. Follow [CLEANUP.md](CLEANUP.md) before removing infrastructure. No automatic runtime destroy command is included in this release.
+Preserve both Terraform state and `aidp-workspace.json`. Follow [CLEANUP.md](CLEANUP.md) before removing infrastructure. The full cleanup runner supports `destroy.sh --include-runtime` for inventory-scoped runtime deletion before infrastructure removal.

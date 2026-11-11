@@ -243,7 +243,7 @@ def tf_stage(cfg, stage, *, apply=False, destroy=False, yes=False, ack=False):
     backend={'terraform':{'backend':{'local':{'path':str(canonical/'terraform.tfstate')}}}}
     private_json(canonical/'automation_override.tf.json',backend)
     private_json(canonical/'terraform.tfvars.json',variables)
-    if destroy:
+    if destroy and PROTECTED.get(stage):
         backend['resource']={}
         for kind,name in PROTECTED.get(stage,[]):backend['resource'].setdefault(kind,{})[name]={'lifecycle':{'prevent_destroy':False}}
     private_json(work/'automation_override.tf.json',backend)

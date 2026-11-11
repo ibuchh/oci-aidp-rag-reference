@@ -233,5 +233,12 @@
     "controller_tests_passed": 86,
     "checked": "Default and explicit preview remain non-applying; conflicting apply flags/actions fail before config or cloud checks.",
     "cloud_resources_changed": false
+  },
+  "destroy_override_fix": {
+    "verified_utc": "2026-11-11T17:18:34.401469+00:00",
+    "change": "Omit the Terraform JSON resource block when a destroy stage has no protected resources.",
+    "controller_tests_passed": 87,
+    "offline_terraform_regression": "Generated destroy override initializes, validates and plans for all seven AIDP stage names using terraform_data fixtures; protected lifecycle overrides and canonical source protection verified.",
+    "cloud_resources_changed": false
   }
 }

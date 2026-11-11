@@ -16,7 +16,7 @@
     ".gitignore": "71656d3f36b62d46d096bf179aa7dd8bfa02ede9d0e8701f8701086e55e44f7e",
     "CUSTOMER_HANDOVER.md": "35f0235cc5300aaba9b57e4dc0f69938208de7dc5f85e23de03b4f298fc2911e",
     "README.md": "535c84772a12e3cca6ca7070920e1ffdea3d9051f420fc2190387434f417861c",
-    "VALIDATION.json": "13b377ccfbd372f9597b941feb5761f458704655dc3d804366674d6b08f0cd67",
+    "VALIDATION.json": "d550b82b1fa96edfa876de2003942941a6345730436e59ec49debd6571c573fa",
     "apps/streamlit/.dockerignore": "166a684f73485067f3d6778efc9079c22c468d946a0c069bfcc7abc2b051f980",
     "apps/streamlit/.streamlit/config.toml": "4b896f7f3f115e6c18b190c3edc12a5aaf3120c19beea6bac039322e854eeb66",
     "apps/streamlit/Dockerfile": "99646543a5efa19dc6d6acfb461ac640f00fdc3398e90b317e59f6bea366a7c0",
@@ -114,7 +114,7 @@
     "scripts/inference_stack.py": "18607131d6fc4733a78230d269b7cb6da218017e2d9cbf7661ab704acc21b066",
     "scripts/node.py": "aa13ccc480b33429a33b0873a89df24840ce244bc44ccb32514f2ef005f30ed6",
     "scripts/pin-monitoring-images.py": "8be4cbf4737748984049a8bbf5759ace0dff8b16c69cb22d0063cc98ee3614a0",
-    "scripts/poc.py": "47a51f6bb065166849119d3bdcb61fb70e11ff40e144997a0d78df57964623b0",
+    "scripts/poc.py": "833f84fd316ca05732146d7c9119b817618d7c2da19462b237af0e56ed7f332f",
     "scripts/runtime_bundle.py": "2860b2e4c10c2cd0518f5cfead8c4aced1560e6cf1c95d2b640ab193d2f3c3e0",
     "scripts/terraform_progress.py": "d6c6139a9aea454fcc436b50b74223c96a7783b27a1a49a4d8aa18847b6c1bd2",
     "scripts/validate-api.py": "ae254f3c799a9e3f2e7c13794c335c4b2fded7beb86b889eb337697c30916327",
@@ -183,7 +183,7 @@
     "tests/test_host_pins.py": "bfa8ab1859763e11a712f49373c97f7713bb1d2dd980d8d1f85d5bd095e50eeb",
     "tests/test_hosts.py": "8379aaa31d8c277b0925fc4b14cac7f9065f6f191d9ffe42a50102911c0cc991",
     "tests/test_labctl.py": "411917e829e2dc3d821c8a412210c013ad0e41c3451a7ffedc82d5568bfc0dd0",
-    "tests/test_stage_progress.py": "b927a38898a5511d31c5a65e5a9f5ee1ffdf7fbdad6098ab10232382ccc7fbc2",
+    "tests/test_stage_progress.py": "27878be32996da2fb6eb911841a5257d96c24f926068ba4b9dd58c1a061c77e6",
     "tests/test_terraform_progress.py": "ded19b4f10ce846f8b925b54282cca61415ffb783776e845c80dd18c0fb94660"
   }
 }

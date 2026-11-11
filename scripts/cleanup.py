@@ -18,6 +18,7 @@ import subprocess
 import tarfile
 import time
 from urllib.parse import quote, urlencode
+from uuid import uuid4
 
 from aidp_workspace import Api, ApiError
 from poc import ROOT, PocError, oci, output, private_json
@@ -438,14 +439,13 @@ class RuntimeCleanup:
                         headers['if-match'] = current_headers['etag']
                     if current.get('displayName') not in (None, op['name']):
                         raise PocError('Resource changed since preview. Regenerate and review the cleanup plan.')
-                    if op['kind'] == 'agent' and current.get('computeKey'):
-                        self.request('PUT', op['path'], {'computeKey': None}, headers=headers)
-                        # Detaching TEST is asynchronous on some runtimes. Agent deletion
-                        # must be refused by the service if its dependencies remain.
-                        current, current_headers = self.get(op['path'], op['collection'], op['key'])
+                    if op['kind'] == 'agent' and (current.get('computeKey') or record.get('playground_detach')):
+                        current, current_headers = self.detach_playground(op, current, record)
+                        if current is None:
+                            record['status'] = 'DONE'
+                            self.save()
+                            continue
                         headers = {'if-match': current_headers['etag']} if current_headers.get('etag') else {}
-                        if current and current.get('computeKey'):
-                            raise PocError('Playground compute detachment is still pending; rerun cleanup to resume.')
                 if op.get('cascade'):
                     headers['is-forced'] = 'true'
                 if op.get('file_path'):
@@ -469,6 +469,49 @@ class RuntimeCleanup:
         self.saved['runtime_verified'] = True
         self.saved['runtime_verified_utc'] = utc()
         self.save()
+
+    def detach_playground(self, op, current, record):
+        """Use the Console's detach action; a null computeKey update is ignored.
+
+        This action currently exists on the Console's 20240831 data-plane API,
+        but not the public 20260430 Agent client. Keep it scoped to the exact
+        inventoried agent/compute and verify completion through the public API.
+        """
+        compute_key = self.baseline.get('resources', {}).get('compute', {}).get('key')
+        detach = record.get('playground_detach', {})
+        if current.get('computeKey') not in (None, compute_key):
+            raise PocError('Agent compute changed after preview. Infrastructure was preserved.')
+        if detach and detach.get('compute_key') != compute_key:
+            raise PocError('Recorded Playground detach target changed; reconcile the journal.')
+        if current.get('computeKey') and detach.get('status') not in ('REQUESTED', 'DONE'):
+            detach = record.setdefault('playground_detach', {
+                'compute_key': compute_key, 'retry_token': str(uuid4()), 'status': 'INTENT'})
+            self.save()
+            endpoint = (f'https://aidp.{self.cfg["region"]}.oci.oraclecloud.com/20240831/'
+                        f'dataLakes/{key(self.aidp_id)}{self.prefix}/agentFlows/{key(op["key"])}/actions/detachCompute')
+            print('Deselecting Playground AI Compute: '+op['name'], flush=True)
+            _, response = self.request('POST', op['path']+'/actions/detachCompute',
+                                      {'agentFlowComputeKey': compute_key}, endpoint=endpoint,
+                                      token=detach['retry_token'])
+            detach.update(status='REQUESTED', request_id=response.get('opc-request-id'), updated_utc=utc())
+            self.save()
+        deadline = time.monotonic()+self.wait_seconds
+        while True:
+            current, headers = self.get(op['path'], op['collection'], op['key'])
+            if current and current.get('displayName') != op['name']:
+                raise PocError('Agent identity changed while detaching. Infrastructure was preserved.')
+            if current and current.get('computeKey') not in (None, compute_key):
+                raise PocError('Agent compute changed while detaching. Infrastructure was preserved.')
+            test_state = ((current or {}).get('deploymentState') or {}).get('TEST')
+            if current is None or (not current.get('computeKey') and test_state in (None, 'INACTIVE', 'DELETED')):
+                detach.update(status='DONE', updated_utc=utc())
+                record['playground_detach'] = detach
+                self.save()
+                return current, headers
+            if time.monotonic() >= deadline:
+                raise PocError('Playground detach was requested but is not verified yet. '
+                               'Infrastructure was preserved; rerun the same command to resume waiting.')
+            time.sleep(5)
 
 
 def schedule_secret(cfg, journal, *, apply=False):

@@ -292,5 +292,21 @@
     "change": "Explain deriving EXTRA_WORKSPACE_KEY from the GET-only cleanup preview, including the BLOCKED output example.",
     "code_unchanged": true,
     "cloud_commands_executed": false
+  },
+  "playground_detach_fix": {
+    "verified_utc": "2026-11-11T20:10:44.861259+00:00",
+    "status": "PASS",
+    "controller_tests_passed": 117,
+    "cleanup_tests_passed": 27,
+    "cause": "A null computeKey update does not invoke Playground detach.",
+    "fix": "Use the Console detachCompute POST with the inventoried agentFlowComputeKey; persist request intent and retry token, wait for attachment and TEST runtime clearance, reconcile on resume.",
+    "live_read_only_checks": [
+      "Inspected Console detach handler, request body and POST route.",
+      "Confirmed GET of exact owned agent on the Console API returns the same key and attachment."
+    ],
+    "limitations": [
+      "Corrected detach POST and downstream destruction have not been executed during implementation; the operator performs live acceptance."
+    ],
+    "cloud_mutations_executed_by_assistant": false
   }
 }

@@ -30,7 +30,7 @@ class FakeApi:
             '/workspaces/ws/clusters/cpu': {'key':'cpu','displayName':'fixture_poc_ai_compute','type':'AI_COMPUTE','state':'ACTIVE'},
             '/workspaces/ws/agents/base': {'key':'base','displayName':'fixture_poc_agent','type':'CODE','computeKey':'cpu',
                                            'deploymentState':{'TEST':'ACTIVE'}},
-            '/workspaces/ws/agents/rag': {'key':'rag','displayName':'fixture_poc_rag_agent','type':'CODE','computeKey':'cpu'},
+            '/workspaces/ws/agents/rag': {'key':'rag','displayName':'fixture_poc_rag_agent','type':'CODE','computeKey':'cpu','deploymentState':{'TEST':'ACTIVE'}},
             '/workspaces/ws/agents/base/deployments/prod': {'key':'prod','displayName':'base-endpoint','agentKey':'base'},
             '/workspaces/ws/agents/base/deployments/old': {'key':'old','displayName':'previous-version','agentKey':'base'},
             '/workspaces/ws/agents/rag/deployments/rag-prod': {'key':'rag-prod','displayName':'rag-endpoint','agentKey':'rag'},
@@ -43,6 +43,7 @@ class FakeApi:
         self.files = [{'path':'01.txt','displayName':'01.txt','type':'FILE'}]
         self.calls, self.async_states = [], {}
         self.async_delete = False
+        self.detach_pending = False
         self.interrupt_after_delete = None
 
     def get(self, path):
@@ -69,9 +70,18 @@ class FakeApi:
             raise ApiError(404,'NotFound','fixture-request')
         if method == 'PUT':
             assert '/agents/' in path and body == {'computeKey':None}
-            self.resources[path]['computeKey'] = None
-            self.resources[path]['deploymentState'] = {'TEST':'INACTIVE'}
+            # The service ignores a null computeKey update; this is not detach.
             return copy.deepcopy(self.resources[path]), {}
+        if method == 'POST' and path.endswith('/actions/detachCompute'):
+            agent = path.removesuffix('/actions/detachCompute')
+            assert body == {'agentFlowComputeKey':'cpu'}
+            assert kwargs['endpoint'] == ('https://aidp.us-ashburn-1.oci.oraclecloud.com/20240831/dataLakes/'
+                +self.aidp_id+'/workspaces/ws/agentFlows/'+agent.rsplit('/',1)[1]+'/actions/detachCompute')
+            assert kwargs['token']
+            if not self.detach_pending:
+                self.resources[agent]['computeKey'] = None
+                self.resources[agent]['deploymentState'] = {}
+            return {}, {'opc-request-id':'detach-request'}
         if method == 'DELETE':
             headers = kwargs.get('headers', {})
             if path.endswith('/actions/deleteFile'):
@@ -150,13 +160,46 @@ class CleanupTests(unittest.TestCase):
         controller = self.controller();controller.preview();controller.execute()
         calls = [(m,p) for m,p,_,_ in self.api.calls if m!='GET']
         self.assertLess(calls.index(('DELETE','/workspaces/ws/agents/base/deployments/old')),
-                        calls.index(('PUT','/workspaces/ws/agents/base')))
+                        calls.index(('POST','/workspaces/ws/agents/base/actions/detachCompute')))
         self.assertLess(calls.index(('DELETE','/workspaces/ws/agents/rag')),
                         calls.index(('DELETE','/schemas/default.fixture_poc_rag')))
         self.assertLess(calls.index(('DELETE','/schemas/default.fixture_poc_rag')),
                         calls.index(('DELETE','/workspaces/ws/clusters/cpu')))
         self.assertEqual(set(self.api.resources), {'/workspaces/default'})
         self.assertTrue(controller.saved['runtime_verified'])
+
+    def test_pending_detach_stops_before_agent_delete_and_resumes_without_reposting(self):
+        self.api.detach_pending = True
+        controller = self.controller(); controller.preview()
+        with self.assertRaisesRegex(poc.PocError, 'not verified yet'):
+            controller.execute()
+        self.assertIn('/workspaces/ws/agents/rag', self.api.resources)
+        self.assertIn('/workspaces/ws/clusters/cpu', self.api.resources)
+        self.assertFalse(controller.saved.get('runtime_verified'))
+        self.assertEqual(controller.saved['operations']['/workspaces/ws/agents/rag']['playground_detach']['status'], 'REQUESTED')
+        self.api.resources['/workspaces/ws/agents/rag']['computeKey'] = None
+        self.api.resources['/workspaces/ws/agents/rag']['deploymentState'] = {}
+        self.api.detach_pending = False
+        controller = self.controller(); controller.preview(); controller.execute()
+        self.assertEqual(sum(m=='POST' and p=='/workspaces/ws/agents/rag/actions/detachCompute'
+                             for m,p,_,_ in self.api.calls), 1)
+        self.assertTrue(controller.saved['runtime_verified'])
+
+    def test_compute_change_after_preview_blocks_detach(self):
+        controller = self.controller(); controller.preview()
+        self.api.resources['/workspaces/ws/agents/rag']['computeKey'] = 'foreign'
+        with self.assertRaisesRegex(poc.PocError, 'compute changed'):
+            controller.execute()
+        self.assertFalse(any(m=='POST' for m,_,_,_ in self.api.calls))
+
+    def test_detached_attachment_with_active_test_still_blocks_agent_deletion(self):
+        self.api.detach_pending = True
+        controller = self.controller(); controller.preview()
+        with self.assertRaises(poc.PocError): controller.execute()
+        self.api.resources['/workspaces/ws/agents/rag']['computeKey'] = None
+        controller = self.controller(); controller.preview()
+        with self.assertRaises(poc.PocError): controller.execute()
+        self.assertIn('/workspaces/ws/agents/rag', self.api.resources)
 
     def test_resume_after_lost_delete_response_does_not_repeat_completed_deletion(self):
         controller = self.controller();controller.preview()

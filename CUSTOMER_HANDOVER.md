@@ -24,7 +24,7 @@ No demonstration credentials, account configuration, Terraform state, GPU image 
 
 ## Procedure
 
-### 1 Extract and verify the package
+### 1. Extract and verify the package
 
 Extract `customer-vllm-aidp-poc-complete.zip` using your archive application, then open the extracted `customer-vllm-aidp-poc` folder in Terminal:
 
@@ -35,7 +35,7 @@ python3 scripts/verify-release.py
 
 Expected: `Release integrity verified` with the source-file count. This checks the packaged files against the included manifest without OCI requests; it does not establish publisher authenticity.
 
-### 2 Review inputs and permissions
+### 2. Review inputs and permissions
 
 - [Create the non-admin user, group, compartment and permissions](docs/NON_ADMIN_SETUP.md)
 - [Package overview and automation boundaries](README.md)
@@ -44,7 +44,7 @@ Expected: `Release integrity verified` with the source-file count. This checks t
 - [Administrator and IAM instructions](docs/IAM.md)
 - [Editable architecture diagram](diagrams/vllm-aidp-completed-architecture.drawio)
 
-### 3 Deploy and validate
+### 3. Deploy and validate
 
 Follow [DEPLOYMENT.md](docs/DEPLOYMENT.md) from the first step. It covers OCI profile setup, image import, generation of your own `poc-config.json`, reviewed infrastructure deployment, private connectivity and `vllm_aidp_poc_agent` acceptance.
 
@@ -54,7 +54,7 @@ Read [RAG_KNOWLEDGE_BASE.md](docs/RAG_KNOWLEDGE_BASE.md) for the full procedure.
 
 For routine use, follow [OPERATIONS.md](docs/OPERATIONS.md). For managed workspace and agent phases, use [AIDP_WORKSPACE_AUTOMATION.md](docs/AIDP_WORKSPACE_AUTOMATION.md).
 
-### 4 Validate and operate the RAG extension
+### 4. Validate and operate the RAG extension
 
 From the same populated deployment folder:
 
@@ -69,7 +69,7 @@ Expected: the five sample acceptance cases pass, and the answer includes `LANTER
 
 For later documents, use the upload and manual **Ingest now** steps in the RAG guide. Document changes require ingestion; agent-code changes require deliberate republishing. Do not rerun `connect` for ordinary questions.
 
-### 5 Destroy the POC when finished
+### 5. Destroy the POC when finished
 
 Follow [CLEANUP.md](docs/CLEANUP.md) in order. Retain your generated configuration, state and ownership inventories until cleanup verification is complete.
 

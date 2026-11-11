@@ -19,7 +19,7 @@ The reference deployment passed private chat, linked synthetic tool-call/result 
 
 ## Procedure
 
-### 1 Prepare trust and publish the existing inference key
+### 1. Prepare trust and publish the existing inference key
 
 ```bash
 cd "$POC_ROOT"
@@ -29,7 +29,7 @@ python3 scripts/poc.py publish-key
 
 Expected: a public CA certificate and non-secret runtime configuration in `deployments/NAME/runtime`, plus metadata identifying the inference secret in Vault. The key is transferred in memory through the existing verified access path; it is not embedded in Terraform or agent source. If these files already exist for the current deployment, inspect and reuse them. Do not rotate the GPU key as a retry.
 
-### 2 Create private DNS
+### 2. Create private DNS
 
 ```bash
 python3 scripts/poc.py plan --stage aidp-dns
@@ -40,7 +40,7 @@ Expected: two resources, a private zone and A RRSet, in this VCN resolver’s de
 
 No public DNS record or public GPU endpoint is created. The controller refuses a matching private zone outside this stage’s ownership.
 
-### 3 Deploy the Credential Store Vault policy
+### 3. Deploy the Credential Store Vault policy
 
 ```bash
 python3 scripts/poc.py plan --stage aidp-credential-iam
@@ -51,7 +51,7 @@ Expected: one policy scoped to this AIDP instance, the existing inference secret
 
 The direct `runtime-iam` stage is a separate, optional resource-principal approach. The observed AI Compute identity belongs to an Oracle-managed `dataflowcomputecluster` in a service tenancy. The controller refuses to treat that identity as a verified customer-tenancy principal. Credential Store is the path validated here.
 
-### 4 Create or resume the managed runtime with one command
+### 4. Create or resume the managed runtime with one command
 
 After completing steps 1–3:
 
@@ -63,7 +63,7 @@ This performs the workspace/compute setup, credential preparation, private HTTPS
 
 The detailed phase commands below are available for inspection and recovery.
 
-### 4a Workspace, AI Compute and coded agent
+### 4a. Workspace, AI Compute and coded agent
 
 ```bash
 python3 scripts/aidp_workspace.py plan
@@ -77,7 +77,7 @@ Expected: workspace `NAME-private` uses the foundation’s exact workspace subne
 
 Compute and agent names use underscores because the service rejects hyphens in compute names. The workspace name permits hyphens.
 
-### 5 Prepare Credential Store references and run the probe
+### 5. Prepare Credential Store references and run the probe
 
 ```bash
 python3 scripts/aidp_workspace.py prepare-credential-probe
@@ -106,7 +106,7 @@ Expected in `deployments/NAME/runtime-identity.json`:
 
 The probe contains only the private URL, public CA and credential names. It reports presence of a fixed set of proxy-variable names without exposing their values. If direct transport fails and runtime proxy configuration exists, it can test that configured path with certificate verification still enabled.
 
-### 6 Publish the self-contained inference agent
+### 6. Publish the self-contained inference agent
 
 Proceed only after the private transport and Vault reference checks pass.
 

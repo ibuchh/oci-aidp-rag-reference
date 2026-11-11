@@ -34,7 +34,7 @@ The reference uses `aidataplatform`. A legacy `datalake` instance needs its actu
 
 The simplest execution uses an approved customer deployment profile that may create the POC policies. If policy creation must be performed separately, use this staged sequence instead of the monolithic `--through aidp` command.
 
-### 1 Operator deploys inference and foundation
+### 1. Operator deploys inference and foundation
 
 ```bash
 ./deploy.sh --apply --through inference
@@ -43,7 +43,7 @@ python3 scripts/poc.py plan --stage aidp-foundation
 python3 scripts/poc.py apply --stage aidp-foundation
 ```
 
-### 2 Administrator prepares its profile configuration
+### 2. Administrator prepares its profile configuration
 
 On a customer-controlled workstation/runner with the same source, protected state and an approved administrator profile, create a separate config. Never copy another person's API signing key. If identities must run on separate machines, use the customer's protected metadata/state handoff process; do not send app login files or an entire `.oci` directory.
 
@@ -65,7 +65,7 @@ PY
 
 Only the profile changes; tenancy, region, compartment, POC name and state namespace remain the same. The configured SSH key path must be valid on the runner because the shared configuration validator checks it, even for IAM phases. The profile/tenancy guard runs before apply.
 
-### 3 Administrator applies bootstrap policies
+### 3. Administrator applies bootstrap policies
 
 ```bash
 python3 scripts/poc.py plan \
@@ -79,7 +79,7 @@ python3 scripts/poc.py apply \
 
 Expected: three new policies, no unrelated modifications. Review them before confirmation and allow propagation. Preserve their canonical states; duplicate Console creation without import creates an ownership problem.
 
-### 4 Operator provisions Lakehouse and AIDP
+### 4. Operator provisions Lakehouse and AIDP
 
 ```bash
 python3 scripts/poc.py plan --stage lakehouse
@@ -93,7 +93,7 @@ python3 scripts/poc.py apply \
 
 Wait for AIDP Active/AI features Ready. Continue with deployment guide steps 6–8: host health, trust/key preparation and private DNS.
 
-### 5 Administrator applies the inference Credential Store policy
+### 5. Administrator applies the inference Credential Store policy
 
 After `publish-key` records the actual inference-secret ID:
 

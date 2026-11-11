@@ -219,5 +219,12 @@
     "scope": "All customer and published Markdown guides, including source copies.",
     "deployment_code_unchanged": true,
     "cloud_commands_executed": false
+  },
+  "documentation_numbering_style": {
+    "updated_utc": "2026-11-11T17:00:59.346002+00:00",
+    "change": "Added a period after numbered heading labels, including lettered substeps such as 2a.",
+    "scope": "All customer and published Markdown guides, including source copies.",
+    "deployment_code_unchanged": true,
+    "cloud_commands_executed": false
   }
 }

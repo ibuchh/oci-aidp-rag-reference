@@ -19,7 +19,7 @@ The default POC name `vllm-aidp-poc` produces workspace `vllm-aidp-poc-private`,
 
 ## Procedure
 
-### 1 Extract, verify and configure the OCI profile
+### 1. Extract, verify and configure the OCI profile
 
 From the directory containing the downloaded complete ZIP:
 
@@ -41,13 +41,13 @@ Use your organization's approved OCI API-key setup. If needed, `oci setup config
 
 Expected: the intended profile exists in `~/.oci/config` and can read its tenancy, region subscriptions and compartment metadata.
 
-### 2 Import or select the customer GPU image
+### 2. Import or select the customer GPU image
 
 In the selected OCI region, open Compute → Custom Images → Import image using your approved image source. Wait for `AVAILABLE` and verify `VM.GPU.A10.2` compatibility. If an approved compatible image already exists in your tenancy, use it instead. Record its regional OCID.
 
 The monitoring VM uses an automatically discovered Ubuntu 24.04 CPU platform image. It does not require a GPU image.
 
-### 3 Generate your configuration
+### 3. Generate your configuration
 
 ```bash
 ./setup.sh --profile CUSTOMER_POC
@@ -76,7 +76,7 @@ POC_PREFIX=$(python3 -c \
 
 `POC_PREFIX` is used in schema, compute and agent names; the workspace uses `POC_NAME-private`.
 
-### 4 Run local checks and OCI preflight
+### 4. Run local checks and OCI preflight
 
 ```bash
 python3 scripts/validate.py
@@ -88,7 +88,7 @@ The first command performs local compilation, Terraform validation/mock tests an
 
 Preflight uses read-only OCI calls. Preview creates local plans only. On empty state, dependent plans wait for shared resource outputs. Neither preflight nor preview reserves GPU capacity.
 
-### 5 Deploy infrastructure, policies and public apps
+### 5. Deploy infrastructure, policies and public apps
 
 If your approved profile may create the required IAM policies:
 
@@ -109,7 +109,7 @@ Baseline serving is pinned Qwen3-8B with vLLM 0.11.0, FP16, tensor parallelism 2
 
 The bootstrap acknowledgment is required by the current controller. If private Lakehouse/AIDP initialization fails, retain successful state and inspect the real work request; do not expose the database publicly or create duplicate paid resources as a retry.
 
-### 6 Validate the baseline and AIDP readiness
+### 6. Validate the baseline and AIDP readiness
 
 ```bash
 python3 scripts/node.py gpu-health
@@ -123,7 +123,7 @@ Expected: two healthy GPUs, healthy monitoring, private chat PASS and an observe
 
 In OCI Console, wait until AIDP is Active, its AI feature status is Ready and the dedicated Lakehouse is Available. Terraform completion alone is not the final agent acceptance gate. If the existing instance is still creating or its AI features are not Ready, wait for that same instance; after it is Active/Ready, resume the same deployment/configuration. If AI Compute reports CREATING or Installing software, retain its inventory and rerun `aidp_workspace.py connect` after readiness; do not create replacement compute as a retry.
 
-### 7 Prepare the private trust bundle and Vault key
+### 7. Prepare the private trust bundle and Vault key
 
 ```bash
 python3 scripts/poc.py runtime-bundle
@@ -132,7 +132,7 @@ python3 scripts/poc.py publish-key
 
 Expected: public CA certificate, non-secret runtime configuration and inference-secret metadata under `deployments/NAME/runtime/`. The existing model key is transferred through verified host access into the dedicated Vault. Its value is not placed in Terraform or uploaded agent source. An already recorded Active secret is reused.
 
-### 8 Create private DNS and Credential Store IAM
+### 8. Create private DNS and Credential Store IAM
 
 ```bash
 python3 scripts/poc.py plan --stage aidp-dns
@@ -146,7 +146,7 @@ Use the administrator profile configuration from [IAM.md](IAM.md) for the creden
 
 Expected: private `inference.lab` DNS resolves to your actual GPU IP, and a policy permits the exact AIDP instance to read the exact inference secret bundle, read/update its metadata for required governance tagging and use its dedicated encryption key. This name matches the generated GPU certificate. The generic optional `runtime-iam` stage is not used.
 
-### 9 Create the workspace, AI Compute and coded agent
+### 9. Create the workspace, AI Compute and coded agent
 
 ```bash
 python3 scripts/aidp_workspace.py connect \
@@ -157,7 +157,7 @@ This creates the private workspace and exact subnet/NSG attachment, 1-OCPU/16-GB
 
 Expected final agent: `vllm_aidp_poc_agent` for the default name. The GPUs remain on the standalone VM; AI Compute runs CPU orchestration in Oracle-managed infrastructure. If installation exceeds the deadline, rerun the same command with the same inventory to resume. Do not create a second compute as a retry.
 
-### 10 Prepare the optional RAG schema and sample documents
+### 10. Prepare the optional RAG schema and sample documents
 
 Skip steps 10–14 if you only need baseline inference. Complete step 9 first and retain its `aidp-workspace.json`. These commands reuse its exact workspace and AI Compute; they do not create another GPU VM or change Streamlit.
 
@@ -181,7 +181,7 @@ python3 integration/rag/rag.py upload-documents \
 
 Expected: three successful uploads, or `Already recorded uploaded` for unchanged files. The helper uses the Python/OCI SDK belonging to OCI CLI when required and records SHA-256 hashes in the RAG inventory.
 
-### 11 Create the native knowledge base and ingest the volume
+### 11. Create the native knowledge base and ingest the volume
 
 In AIDP, navigate to **Master catalog → default → POC_PREFIX_rag**. Use **Add to schema → Knowledge base** or the Knowledge Bases create control. Create `aster_knowledge_base` with:
 
@@ -193,7 +193,7 @@ Wait for the KB to be Active. Open it → **Data Source** → the plus button. S
 
 Substitute the actual `POC_PREFIX`; the UI does not expand shell variables. The packaged public-API helper does not create or ingest native KBs. These are explicit UI steps. See [Oracle knowledge-base procedures](https://docs.oracle.com/en/cloud/paas/ai-data-platform/aidug/knowledge-bases.html).
 
-### 12 Publish the separate RAG agent
+### 12. Publish the separate RAG agent
 
 Only after the native KB exists and ingestion succeeds:
 
@@ -225,7 +225,7 @@ The published RAG agent follows this sequence:
 
 Open the [full-size request flow](images/05-aidp-rag-flow.png). The request uses native KB retrieval before private vLLM generation. The [editable draw.io diagram](../diagrams/vllm-aidp-completed-architecture.drawio) includes this as the **AIDP RAG request flow** tab.
 
-### 13 Verify RAG in AIDP Playground
+### 13. Verify RAG in AIDP Playground
 
 Open **NAME-private → Agents → POC_PREFIX_rag_agent → Playground**. On the first opening, allow the test runtime to deploy; select the same existing AI Compute if prompted and wait for Active. Test:
 
@@ -235,7 +235,7 @@ Open **NAME-private → Agents → POC_PREFIX_rag_agent → Playground**. On the
 
 These are fictional test facts. The KB does not add RAG to the original baseline agent or Streamlit. Both the deployed endpoint and Playground must be tested independently.
 
-### 14 Update documents manually later
+### 14. Update documents manually later
 
 Upload files directly inside an explicitly selected directory:
 

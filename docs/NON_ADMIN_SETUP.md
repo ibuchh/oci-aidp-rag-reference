@@ -15,7 +15,7 @@ This guide applies to the standalone package. It does not grant tenancy administ
 
 ## Procedure
 
-### 1 Create the user — customer administrator
+### 1. Create the user — customer administrator
 
 In OCI Console, open Identity & Security → Domains and select the approved identity domain. Under its user-management area, open Users → Create.
 
@@ -31,7 +31,7 @@ Expected: the active user exists in the selected domain. If an identically named
 
 [Oracle user creation instructions](https://docs.oracle.com/en-us/iaas/Content/Identity/users/create-user-accounts.htm).
 
-### 2 Create the group and membership — customer administrator
+### 2. Create the group and membership — customer administrator
 
 In the same identity domain, open Groups → Create Group:
 
@@ -44,7 +44,7 @@ Expected: the user is a member of `poc-deployment` and is not given administrato
 
 [Oracle group creation](https://docs.oracle.com/en-us/iaas/Content/Identity/groups/create-groups.htm), [group membership](https://docs.oracle.com/en-us/iaas/Content/Identity/users/assign-groups-user-account.htm).
 
-### 3 Create compartment poc — customer administrator
+### 3. Create compartment poc — customer administrator
 
 Open Identity & Security → Compartments. Select the tenancy root as the parent for this recommended dedicated POC layout, then select Create Compartment:
 
@@ -55,7 +55,7 @@ Record its OCID and wait until it is Active. If `poc` already exists under that 
 
 Compartment creation does not subscribe a region or reserve GPU capacity. [Oracle compartment creation](https://docs.oracle.com/en-us/iaas/Content/Identity/compartments/To_create_a_compartment.htm).
 
-### 4 Set the customer variables — administrator workstation
+### 4. Set the customer variables — administrator workstation
 
 Replace every placeholder. These are metadata, not passwords or private keys.
 
@@ -70,7 +70,7 @@ export OCI_PROFILE="CUSTOMER_POC"
 
 `OCI_REGION` selects the deployment/API region. IAM policies below are not region-restricted and apply within their stated compartment across subscribed regions. If policy-enforced region restrictions are required, the security administrator must review region conditions separately and preserve the IAM home-region workflow.
 
-### 5 Generate the deployment-group policy — customer administrator
+### 5. Generate the deployment-group policy — customer administrator
 
 Run this locally to generate a complete policy text file with actual OCIDs. It creates no OCI resources. Group OCIDs avoid ambiguity with identity-domain names.
 
@@ -136,7 +136,7 @@ These are reviewed service-family permissions for this package, not a mathematic
 
 References: [IAM discovery](https://docs.oracle.com/en-us/iaas/Content/Identity/Reference/iampolicyreference.htm), [Compute](https://docs.oracle.com/en-us/iaas/Content/Identity/Reference/corepolicyreference.htm), [Bastion](https://docs.oracle.com/en-us/iaas/Content/Bastion/Tasks/managingbastions.htm), [DNS](https://docs.oracle.com/en-us/iaas/Content/Identity/Reference/dnspolicyreference.htm), [Vault](https://docs.oracle.com/en-us/iaas/Content/Identity/Reference/keypolicyreference.htm), [AIDP IAM](https://docs.oracle.com/en/cloud/paas/ai-data-platform/aidug/iam-policies-oracle-ai-data-platform.html).
 
-### 6 Configure the deployment user's API profile — deployment user
+### 6. Configure the deployment user's API profile — deployment user
 
 Activate the account and complete the approved sign-in process. Generate the API signing key locally and have its public key registered for this exact user through the customer's approved process. The administrator can register the public key if self-service key management is restricted. Never send the private key to the customer administrator or place it in this package.
 
@@ -148,7 +148,7 @@ oci setup config
 
 Use the profile name stored in `OCI_PROFILE`, for example `CUSTOMER_POC`. The account's browser password and the API signing key are separate credentials. The current package expects an API-key profile.
 
-### 7 Verify access and generate POC configuration — deployment user
+### 7. Verify access and generate POC configuration — deployment user
 
 Set the same metadata variables on the operator workstation; shell variables on the administrator workstation are not transferred automatically. From the extracted `customer-vllm-aidp-poc` folder:
 
@@ -179,7 +179,7 @@ python3 scripts/poc.py preflight
 
 Expected: source integrity passes, the intended tenancy name and compartment `poc` are returned, and setup creates a protected `poc-config.json` for the selected region. Enter the approved regional GPU image, AD, SSH key, actual SSH egress address and non-overlapping VCN CIDR when prompted. Setup and preflight do not provision the stack; preflight does not prove authorization for every future create/delete operation.
 
-### 8 Deploy with separate IAM administrator stages
+### 8. Deploy with separate IAM administrator stages
 
 Follow the staged route in [IAM.md](IAM.md), then the remaining steps in [DEPLOYMENT.md](DEPLOYMENT.md):
 

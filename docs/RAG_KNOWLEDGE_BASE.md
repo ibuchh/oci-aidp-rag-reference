@@ -46,7 +46,7 @@ The public AIDP SDK used during implementation exposes schema/volume/agent APIs 
 
 ## Procedure
 
-### 1 Inspect the existing extension
+### 1. Inspect the existing extension
 
 Run from the extracted `customer-vllm-aidp-poc` package root:
 
@@ -65,7 +65,7 @@ If prepare reports a pending asynchronous operation, wait for it to finish in AI
 
 For a deliberately new supported deployment, `rag_poc.py prepare --apply` creates the schema/volume with an ownership inventory and retry tokens. `rag.py upload-documents --apply` uploads the bundled TXT files, records hashes and selects the OCI CLI Python/SDK if the initial interpreter lacks OCI. Use `--documents-dir` explicitly for later approved TXT/PDF/DOCX documents. Name collisions without ownership are rejected. A timed-out create must be reconciled against its persisted intent rather than blindly adopted or recreated.
 
-### 2 Find the knowledge base in AIDP
+### 2. Find the knowledge base in AIDP
 
 Open the AIDP instance → Master catalog → `default` → `vllm_aidp_poc_rag` → Knowledge Bases → `aster_knowledge_base`.
 
@@ -73,7 +73,7 @@ In Data Source, select `synthetic_documents` → Job runs. Wait for a successful
 
 If recreating manually, create the KB with the embedding/chunk settings above, then add the entire volume `/Volumes/default/vllm_aidp_poc_rag/synthetic_documents`, select TEXT only and start ingestion. Wait for successful completion before testing. Use the plus button beside the Data Source filter to add the volume. AIDP takes a volume/folder as the source rather than individual files. Re-ingest changed sources explicitly; this POC adds no scheduled ingestion.
 
-### 3 Connect the separate RAG agent
+### 3. Connect the separate RAG agent
 
 After the native KB exists and ingestion succeeds, record its identity and publish the isolated agent:
 
@@ -84,7 +84,7 @@ python3 integration/rag/rag.py connect --apply
 
 Expected: the endpoint becomes ACTIVE and all five sample acceptance checks pass. These commands require the existing deployed stack and its workspace inventory.
 
-### 4 Ask a question through the deployed RAG endpoint
+### 4. Ask a question through the deployed RAG endpoint
 
 ```bash
 python3 integration/rag/rag_poc.py invoke \
@@ -104,7 +104,7 @@ In AIDP's private workspace, open agent `vllm_aidp_poc_rag_agent` to review the 
 
 The existing Streamlit app still calls vLLM directly. It has not been changed into a RAG client by creating this knowledge base.
 
-### 5 Manually update documents
+### 5. Manually update documents
 
 For later use, upload TXT, PDF or DOCX files from a directory you select:
 
@@ -116,7 +116,7 @@ python3 integration/rag/rag.py upload-documents \
 
 The script skips unchanged file hashes and overwrites changed owned filenames. It does not remove old files or start ingestion. In AIDP open the KB source → Parameters → Ingest now, then wait for Job runs → Succeeded. New source folders or file types must also be selected in the native source configuration. The included acceptance suite checks the synthetic Aster facts; supply your own expected facts when replacing them.
 
-### 6 Publish deliberate agent-code updates
+### 6. Publish deliberate agent-code updates
 
 ```bash
 python3 integration/rag/rag.py record-kb --apply

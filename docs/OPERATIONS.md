@@ -10,7 +10,7 @@ Complete the inference deployment, confirm the current Bastion allowlist, and re
 
 ## Procedure
 
-### 1 Validate hosts
+### 1. Validate hosts
 
 ```bash
 python3 scripts/node.py gpu-health
@@ -19,7 +19,7 @@ python3 scripts/node.py monitoring-health
 
 Expected: two NVIDIA A10 GPUs, active vLLM/Nginx, a mounted model filesystem, healthy Prometheus targets and passing dashboard query checks. The monitoring validator runs against the rendered configuration on the VM, not the source files containing replacement markers.
 
-### 2 Send one inference request
+### 2. Send one inference request
 
 ```bash
 python3 scripts/node.py chat
@@ -35,7 +35,7 @@ python3 scripts/node.py tool-test
 
 Expected: `PASS` and `tool_observed: true`. A model answer alone is insufficient; the client requires a real allowed tool call and the follow-up response.
 
-### 3 Use the public chat UI
+### 3. Use the public chat UI
 
 Open the URL in `states/.pocctl/streamlit-login.json`, authenticate with its username/password, and enter a synthetic prompt. The UI supports a system prompt, model selection, temperature, output-token limit, top-p, penalties, stop sequences, streaming and timeout. Review the redacted request/response inspector as needed.
 
@@ -43,7 +43,7 @@ The app retains conversation data in session memory, with optional manual export
 
 Separate visitors authenticate with the shared POC browser login but receive separate Streamlit sessions. This is POC authentication, without a corporate identity lifecycle or per-user authorization model.
 
-### 4 Generate dashboard traffic
+### 4. Generate dashboard traffic
 
 Keep Grafana open, choose **Last 15 minutes** and a refresh interval such as 5 seconds. On the Mac:
 
@@ -56,7 +56,7 @@ The load driver runs on the monitoring VM, apart from the inference process. It 
 
 Results are saved on the monitoring VM under `/var/lib/monitoring/load-tests/UTC_TIMESTAMP`. `Ctrl+C` stops the foreground SSH command and triggers tunnel cleanup; check for a surviving remote load process if the network disconnects unexpectedly before starting another test.
 
-### 5 Read the dashboards
+### 5. Read the dashboards
 
 - **Inference traffic:** successful requests, request failures, prompt/output token rates and aggregate throughput.
 - **Responsiveness:** time to first token, inter-token latency and request duration. Queued load can increase waiting time even when utilization is high.
@@ -67,7 +67,7 @@ Results are saved on the monitoring VM under `/var/lib/monitoring/load-tests/UTC
 
 Two 24 GiB GPUs provide distributed capacity; they do not form one automatically pooled GPU and do not guarantee twice the speed. The serving baseline explicitly uses tensor parallelism across both devices.
 
-### 6 Reinstall or repair the public app
+### 6. Reinstall or repair the public app
 
 After fixing a failed app build, proxy configuration or certificate issuance prerequisite:
 

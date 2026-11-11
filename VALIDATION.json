@@ -308,5 +308,18 @@
       "Corrected detach POST and downstream destruction have not been executed during implementation; the operator performs live acceptance."
     ],
     "cloud_mutations_executed_by_assistant": false
+  },
+  "cleanup_quickstart_docs": {
+    "verified_utc": "2026-11-11T20:21:27.232096+00:00",
+    "status": "PASS",
+    "change": "Make automated full cleanup the primary workflow; reuse approved workspace arguments in preview and apply; clarify automatic credential deletion, eight-day Vault schedule, resume and completion verification; retain manual fallback.",
+    "checks": [
+      "All cleanup shell blocks parse in Bash and Zsh.",
+      "Executed the automated preview/additional-workspace/apply examples against a local command stub in both shells; same workspace scope reaches preview and apply.",
+      "Local Markdown links and release integrity verified.",
+      "Vault pending-deletion behavior checked against Oracle documentation."
+    ],
+    "cloud_commands_executed": false,
+    "deployment_code_changed": false
   }
 }

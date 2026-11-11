@@ -4,7 +4,7 @@
 
 Cleanup permanently deletes the POC's VMs/disks, FSS/model files, monitoring data, Lakehouse data, native knowledge-base vectors, uploaded RAG documents, AIDP, policies and networking. The controller operates on recorded ownership, not a compartment-wide name scan. Imported images, the pre-existing compartment/operator identities and unrelated resources remain.
 
-Both workflows perform RAG and baseline AIDP data-plane cleanup, inference-secret deletion scheduling, then guarded Terraform destruction. Automated full cleanup also creates and verifies the local controller backup. Vault/key/secret retention and service-managed storage need a final check after apply. No command in this document has been executed in the customer's tenancy as part of handover preparation.
+For full-stack teardown, follow **Automated full cleanup**: preview, review any additional workspace selection, apply, then verify completion. The command creates and verifies a local controller backup, removes the owned AIDP/RAG runtime, schedules the recorded inference secret for deletion, and destroys infrastructure. You do not need to perform the manual backup, runtime-removal or secret-scheduling steps separately. Vault/key/secret retention and service-managed storage still need a final check after apply.
 
 ## Preconditions / Prerequisites
 
@@ -22,16 +22,20 @@ Use the same complete deployment folder, populated configuration and ownership i
 
 ### 1. Preview the complete scope
 
+Run from the extracted deployment folder that contains `destroy.sh` and your populated configuration. The commands below work in Bash or Zsh; keep the same shell session through preview and apply.
+
 ```bash
 CONFIG=poc-config.json
+CLEANUP_SCOPE=(--include-runtime)
 POC_NAME=$(python3 -c \
   'import json,sys; print(json.load(open(sys.argv[1]))["name"])' \
   "$CONFIG")
+DEPLOYMENT_DIR="deployments/$POC_NAME"
 
 ./destroy.sh \
   --config "$CONFIG" \
   --plan \
-  --include-runtime
+  "${CLEANUP_SCOPE[@]}"
 ```
 
 Expected: an AIDP/RAG cleanup inventory, any blockers, a proposed secret-deletion schedule and the Terraform destroy plans. Preview sends no mutating AIDP requests, schedules no secret deletion and applies no Terraform changes. Reports are private files under `deployments/NAME/cleanup/`.
@@ -50,15 +54,15 @@ An additional workspace is never adopted by display name. Review the discovered 
 
 ```bash
 EXTRA_WORKSPACE_KEY=REPLACE_WITH_KEY_FROM_PREVIEW
+CLEANUP_SCOPE+=(--additional-workspace "$EXTRA_WORKSPACE_KEY")
 
 ./destroy.sh \
   --config "$CONFIG" \
   --plan \
-  --include-runtime \
-  --additional-workspace "$EXTRA_WORKSPACE_KEY"
+  "${CLEANUP_SCOPE[@]}"
 ```
 
-Repeat `--additional-workspace` for each approved workspace. This selects that entire workspace, including all contained files, jobs and compute. A missing or unknown key blocks apply. Do not select shared or unrelated workspaces.
+For each additional approved workspace, append another `--additional-workspace KEY` pair to `CLEANUP_SCOPE`, then rerun preview. The same selection is reused by apply below. This selects that entire workspace, including all contained files, jobs and compute. A missing or unknown key blocks apply. Do not select shared or unrelated workspaces.
 
 ### 2. Apply the reviewed cleanup
 
@@ -68,12 +72,12 @@ After the complete preview has no blockers:
 ./destroy.sh \
   --config "$CONFIG" \
   --apply \
-  --include-runtime \
+  "${CLEANUP_SCOPE[@]}" \
   --delete-data \
   --confirm-name "$POC_NAME"
 ```
 
-Include the same `--additional-workspace "$EXTRA_WORKSPACE_KEY"` option when additional workspaces were approved. Do not add `--confirm-aidp-runtime-removed` to automated cleanup; the script verifies runtime removal itself. It asks for `DELETE NAME INCLUDING RUNTIME` and the existing per-component confirmations. For a previously reviewed noninteractive run, append `--yes`; the matching `--confirm-name` and `--delete-data` remain mandatory.
+Keep `CLEANUP_SCOPE` unchanged from the reviewed preview so apply includes the same approved workspaces. Do not add `--confirm-aidp-runtime-removed` to automated cleanup; the script verifies runtime removal itself. It asks for `DELETE NAME INCLUDING RUNTIME` and the existing per-component confirmations. For a previously reviewed noninteractive run, append `--yes`; the matching `--confirm-name` and `--delete-data` remain mandatory.
 
 The apply sequence is:
 
@@ -85,17 +89,44 @@ The apply sequence is:
 
 **The automatic archive contains local controller files, not remote FSS/model data, database contents, Grafana history or uploaded document originals.** Export remote data separately before applying if it must survive. `--delete-data` explicitly approves losing that remote data. Keep the imported GPU image for rebuilding.
 
-Playground cleanup uses the same dedicated Deselect Playground AI Compute action as the Console; setting an agent's `computeKey` to null does not detach it. The detach action currently uses the Console's `20240831` data-plane API. Cleanup records the request and waits until both the compute attachment and active TEST runtime are cleared before deleting the agent. If this action is unavailable or cannot be verified, cleanup stops before secret scheduling or infrastructure destruction. After updating from an older handover, rerun the same full-cleanup command and retain the existing journal; an endpoint already removed is reconciled instead of recreated.
+Playground cleanup deselects each owned agent's Playground AI Compute and waits for its attachment and TEST runtime to clear before deleting that agent. If detachment cannot be verified, cleanup stops before secret scheduling or infrastructure destruction. After a failure or timeout, resolve the reported issue and rerun the same apply command with the same configuration and workspace selections. Keep the existing journal; completed deletions are reconciled and already removed endpoints are not recreated.
 
 Progress is recorded under `deployments/NAME/cleanup/journal.json`. Accepted asynchronous operations are polled and recorded. If a request, permission check, dependency removal or wait fails, later phases stop. Rerun the same command with the same configuration and inventories to resume. `--cleanup-wait-minutes 60` extends the per-operation wait from its default 30 minutes. Never erase state or the journal to bypass a failure.
 
 A failed runtime cleanup prevents inference-secret scheduling and infrastructure apply. A failed backup prevents all automated deletions. Authentication/authorization failures are not treated as missing resources; an HTTP 404 requires a successful parent listing to establish absence. Service dependency conflicts or unsupported API behavior stop cleanup instead of bypassing runtime verification.
 
-After apply, require `runtime_verified: true` and `infrastructure_completed: true` in the journal, then complete the service-side validation at the end of this guide. Vault retention deadlines, external data and pre-existing backups can remain; a successful API request does not certify their physical deletion.
+### 3. Verify completion and secret retention
+
+The automated apply handles both kinds of recorded credentials:
+
+- AIDP Credential Store entries, including the Vault reference and synthetic probe, are deleted during runtime cleanup.
+- The separately recorded inference API-key secret in OCI Vault is scheduled for deletion eight days after successful runtime cleanup. An existing pending deadline is preserved. Unrelated secrets are outside this cleanup scope.
+- A preview schedules nothing. If runtime cleanup stops, the command does not proceed to inference-secret scheduling or infrastructure destruction. A secret already pending deletion from an earlier run retains that state.
+
+`PENDING_DELETION` is the expected immediate Vault result, rather than permanent deletion. The secret becomes unavailable while deletion is pending; permanent removal follows its scheduled deadline. See [Oracle secret deletion](https://docs.oracle.com/en-us/iaas/Content/secret-management/Tasks/delete-secret.htm). Vault and encryption-key deletion can have their own pending deadlines.
+
+Read the local completion record without displaying secret contents:
+
+```bash
+python3 - "$DEPLOYMENT_DIR/cleanup/journal.json" <<'PYCODE'
+import json, sys
+from pathlib import Path
+record = json.loads(Path(sys.argv[1]).read_text())
+print(json.dumps({name: record.get(name) for name in (
+    "runtime_verified", "infrastructure_completed", "secret"
+)}, indent=2))
+PYCODE
+
+python3 scripts/poc.py status --config "$CONFIG"
+```
+
+Expected: `runtime_verified` and `infrastructure_completed` are both `true`, with no remaining Terraform-managed resources reported by status. If an inference secret was recorded, its journal entry shows `PENDING_DELETION` and `time_of_deletion`, or `DELETED` if already removed. The journal records the last observation; verify the secret's current state and deadline in OCI Vault, then complete **Validation Steps** below. Keep the local backup and inventories until all pending deletions and service-side checks are complete.
 
 Oracle API references: [schema cascade deletion](https://docs.oracle.com/en/cloud/paas/ai-data-platform/aiwap/op-aidataplatforms-aidataplatformid-schemas-schemakey-delete.html), [AIDP REST endpoints](https://docs.oracle.com/en/cloud/paas/ai-data-platform/aiwap/rest-endpoints.html).
 
 ## Manual cleanup alternative
+
+Use this path for RAG-only removal or when automatic runtime cleanup cannot be used. For a successful full-stack automated cleanup, skip these manual steps; do not schedule the same secret again.
 
 ### 1. Inventory and preserve evidence
 

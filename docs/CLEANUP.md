@@ -38,7 +38,7 @@ mkdir -p "$BACKUP_DIR"
 cp "$CONFIG" "$BACKUP_DIR/"
 tar -czf "$BACKUP_DIR/deployment-records.tgz" "$DEPLOYMENT_DIR"
 
-./destroy.sh --config "$CONFIG"
+./destroy.sh --config "$CONFIG" --plan
 ```
 
 Expected: local destroy plans and recorded boot-volume IDs are displayed, with no cloud deletion. These Terraform plans do not include the native KB, RAG files, data-plane agents or managed workspaces; reconcile their inventories separately before apply. Review them. This archive contains deployment evidence and possibly passwords/sensitive state; keep it private. It does not back up remote model, metrics or database data.
@@ -135,7 +135,19 @@ Expected: `PENDING_DELETION`. The secret becomes unavailable immediately; perman
 
 If a create intent exists without a secret record, reconcile the exact name/Vault/compartment through metadata with the customer administrator. Do not retrieve secret contents or adopt an unrelated secret as a shortcut. Resolve permission/not-found ambiguity before continuing.
 
-### 4. Apply infrastructure destruction
+### 4. Plan and apply infrastructure destruction
+
+First generate and review the destroy plans:
+
+```bash
+./destroy.sh \
+  --config "$CONFIG" \
+  --plan
+```
+
+Expected: Terraform destroy plans are written locally for review; no cloud resources are deleted. `--plan` explicitly selects the existing default preview behavior. It cannot be combined with `--apply`. The earlier AIDP runtime cleanup and secret-deletion prerequisites still apply before destructive execution.
+
+After reviewing the plans, run the separate apply command:
 
 ```bash
 ./destroy.sh \

@@ -129,15 +129,32 @@ class ComponentInputs(unittest.TestCase):
             read.assert_not_called()
 
     def test_destroy_preview_keeps_active_secret_and_still_reviews_infrastructure(self):
-        with tempfile.TemporaryDirectory() as directory:
-            cfg=dict(self.cfg,state_directory=str(Path(directory)/'states'))
-            record=Path(directory)/'runtime/inference-secret.json'
-            record.parent.mkdir();record.write_text(json.dumps({'id':'ocid1.vaultsecret.oc1.fixture'}))
-            with mock.patch.object(poc,'read_config',return_value=cfg),mock.patch.object(poc,'target_check'),mock.patch.object(poc,'oci',return_value={'lifecycle-state':'ACTIVE'}) as api,mock.patch.object(poc,'inference') as inference:
-                poc.main(['destroy'])
-            api.assert_called_once_with(cfg,'vault','secret','get','--secret-id','ocid1.vaultsecret.oc1.fixture')
-            self.assertFalse(inference.call_args.kwargs['apply'])
-            self.assertTrue(inference.call_args.kwargs['destroy'])
+        for flags in ([], ['--plan']):
+            with self.subTest(flags=flags), tempfile.TemporaryDirectory() as directory:
+                cfg=dict(self.cfg,state_directory=str(Path(directory)/'states'))
+                record=Path(directory)/'runtime/inference-secret.json'
+                record.parent.mkdir();record.write_text(json.dumps({'id':'ocid1.vaultsecret.oc1.fixture'}))
+                with mock.patch.object(poc,'read_config',return_value=cfg),mock.patch.object(poc,'target_check'),mock.patch.object(poc,'oci',return_value={'lifecycle-state':'ACTIVE'}) as api,mock.patch.object(poc,'inference') as inference:
+                    poc.main(['destroy', *flags])
+                api.assert_called_once_with(cfg,'vault','secret','get','--secret-id','ocid1.vaultsecret.oc1.fixture')
+                self.assertFalse(inference.call_args.kwargs['apply'])
+                self.assertTrue(inference.call_args.kwargs['destroy'])
+
+    def test_destroy_plan_and_apply_conflict_before_configuration_or_cloud(self):
+        with mock.patch.object(poc,'read_config') as read, mock.patch.object(poc,'target_check') as cloud:
+            with self.assertRaises(SystemExit) as error:
+                poc.main(['destroy','--plan','--apply'])
+            self.assertEqual(error.exception.code, 2)
+            read.assert_not_called()
+            cloud.assert_not_called()
+
+    def test_destroy_plan_flag_cannot_be_combined_with_apply_action(self):
+        with mock.patch.object(poc,'read_config') as read, mock.patch.object(poc,'target_check') as cloud:
+            with self.assertRaises(SystemExit) as error:
+                poc.main(['apply','--stage','aidp','--plan'])
+            self.assertEqual(error.exception.code, 2)
+            read.assert_not_called()
+            cloud.assert_not_called()
 
 
 class Proxy(unittest.TestCase):

@@ -226,5 +226,12 @@
     "scope": "All customer and published Markdown guides, including source copies.",
     "deployment_code_unchanged": true,
     "cloud_commands_executed": false
+  },
+  "explicit_destroy_plan": {
+    "verified_utc": "2026-11-11T17:14:06.920170+00:00",
+    "change": "Explicit destroy --plan preview; mutually exclusive with --apply and restricted to destroy. Cleanup shows separate plan before apply.",
+    "controller_tests_passed": 86,
+    "checked": "Default and explicit preview remain non-applying; conflicting apply flags/actions fail before config or cloud checks.",
+    "cloud_resources_changed": false
   }
 }

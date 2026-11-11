@@ -1,9 +1,5 @@
 # 🚀 Customer deployment — standalone vLLM and AIDP
 
-## 🏷️ Tags
-
-#oci #aidp #vllm #rag #terraform #deployment
-
 ## 🔹 Overview
 
 Run the phases below in your own OCI tenancy. No demonstration account/profile, image or existing state is required. Keep the package and generated state together until cleanup finishes.

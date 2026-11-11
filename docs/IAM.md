@@ -1,9 +1,5 @@
 # 🔐 Customer IAM and deployment ownership
 
-## 🏷️ Tags
-
-#oci #aidp #iam #customer-handover
-
 ## 🔹 Overview
 
 Operator permissions and AIDP service permissions are separate. The customer should use approved identities and its normal administrator process; the package does not create an administrator user/group or bypass governance denies. Review the statements against the customer's compartment and actual service principal type. [Oracle AIDP IAM guidance](https://docs.oracle.com/en/cloud/paas/ai-data-platform/aidug/iam-policies-oracle-ai-data-platform.html).

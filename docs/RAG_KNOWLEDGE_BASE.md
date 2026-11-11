@@ -1,9 +1,5 @@
 # 📚 Native AIDP knowledge base with private vLLM answers
 
-## 🏷️ Tags
-
-#oci #aidp #rag #vllm #synthetic-data
-
 ## 🔹 Overview
 
 This extension targets the configured OCI deployment using the profile and region in `poc-config.json`. It ingests three fabricated Project Aster TXT documents into a native AIDP knowledge base and uses the private Qwen3-8B endpoint for answer generation.

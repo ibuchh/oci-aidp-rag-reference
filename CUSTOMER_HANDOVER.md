@@ -1,9 +1,5 @@
 # 📦 Customer handover — vLLM and Oracle AI Data Platform
 
-## 🏷️ Tags
-
-#oci #aidp #vllm #rag #terraform #customer-handover
-
 ## 🔹 Overview
 
 This folder contains the source code and instructions for deploying the complete standalone POC in your own OCI tenancy: GPU inference, FSS, monitoring, Streamlit, Oracle AI Data Platform, AI Compute, a baseline coded agent and an optional native AIDP knowledge base with a separate RAG agent.

@@ -1,9 +1,5 @@
 # ⚙️ AIDP workspace, AI Compute and coded-agent automation
 
-## 🏷️ Tags
-
-#oci #aidp #vllm #poc #automation
-
 ## 🔹 Overview
 
 The package uses Terraform for the AIDP instance, private DNS and IAM, plus Oracle’s signed data-plane REST API for the private workspace, AI Compute, Credential Store and agent deployment. Browser uploads and manual runtime-principal configuration are unnecessary for this workflow.

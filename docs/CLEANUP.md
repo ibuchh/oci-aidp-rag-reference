@@ -1,9 +1,5 @@
 # 🧹 Customer teardown — complete POC
 
-## 🏷️ Tags
-
-#oci #aidp #vllm #rag #terraform #cleanup
-
 ## 🔹 Overview
 
 Cleanup permanently deletes the POC's VMs/disks, FSS/model files, monitoring data, Lakehouse data, native knowledge-base vectors, uploaded RAG documents, AIDP, policies and networking. The controller operates on recorded ownership, not a compartment-wide name scan. Imported images, the pre-existing compartment/operator identities and unrelated resources remain.

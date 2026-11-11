@@ -1,9 +1,5 @@
 # 🔐 Customer setup — non-admin POC deployment access
 
-## 🏷️ Tags
-
-#oci #iam #aidp #vllm #customer-setup
-
 ## 🔹 Overview
 
 The customer administrator creates user `irshad.buchh@oracle.com`, group `poc-deployment` and compartment `poc`. The group receives resource-management access within that dedicated compartment. The administrator retains IAM policy creation and deletion, including the AIDP service-policy stages.

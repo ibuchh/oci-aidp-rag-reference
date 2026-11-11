@@ -1,9 +1,5 @@
 # OCI AIDP RAG Reference
 
-## 🏷️ Tags
-
-#oci #aidp #vllm #terraform #poc #customer-handover
-
 ## 🔹 Overview
 
 Reference implementation for deploying, validating, operating and removing private vLLM inference and native RAG with Oracle AI Data Platform (AIDP) in your own OCI tenancy. It includes Terraform, host bootstrap, monitoring, Streamlit and signed API automation for AIDP's private workspace, AI Compute, baseline coded agent and an optional native knowledge-base RAG agent. The customer owns execution, credentials, resource approvals, state, data and cleanup.
@@ -66,21 +62,3 @@ Terraform provisions the infrastructure and policies. The pinned provider does n
 **AIDP runtime and native RAG teardown are explicit Console steps in this release.** The destroy script refuses destructive apply until the operator confirms its removal and schedules the recorded inference secret for deletion. An empty Terraform state does not prove retained backups or managed storage have been removed.
 
 The baseline is one GPU VM and one monitoring VM, synthetic data, Qwen3-8B, public authenticated HTTPS for Streamlit/Grafana and private model HTTPS. The optional RAG extension demonstrates synthetic document retrieval through a separate AIDP agent; Streamlit remains a direct model client. It has no HA inference replica, corporate SSO or validated customer-data SQL/RAG rollout. The GPU certificate initially lasts 30 days and needs coordinated trust renewal. Customer network policy must approve the public web/sslip.io/ACME design before apply. Review a different access design before deployment if that design is unsuitable.
-
-## 🔍 Validation and integrity
-
-The reference environment passed private chat, a real coded-agent synthetic tool round trip, native ingestion of the three Aster documents and all five RAG acceptance cases. Native KB creation and ingestion remain UI steps; the other RAG phases are scripted. That is not an assertion that this package has been deployed in the customer's tenancy. The customer must validate regional services/capacity, their image, IAM, private connectivity, TLS, credentials and cleanup.
-
-After cloning this repository, verify the checked-in source files:
-
-```bash
-python3 scripts/verify-release.py
-```
-
-The repository includes the handover guide, all linked documents, diagram images and editable draw.io source. Manifest verification detects file differences; it does not establish publisher authenticity.
-
-`MANIFEST.json` contains per-file hashes and release adjustments. `VALIDATION.json` contains the performed local checks. `python3 scripts/verify-release.py` checks the distributed source against the manifest; generated config/state are outside the source manifest.
-
-## 📦 Handover record
-
-Before the first apply, record the customer's deployment owner, IAM administrator, region/AD, GPU image owner, state/backup location, web-access approval, TLS renewal owner, model approval and intended cleanup date. Keep customer-generated credentials and full deployment records in customer-controlled protected storage.

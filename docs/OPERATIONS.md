@@ -1,8 +1,5 @@
 # Inference, monitoring and Streamlit operations
 
-## 🏷️ Tags
-#oci #vllm #grafana #streamlit #operations
-
 ## 🔹 Overview
 
 Run commands from the package root on the Mac. `scripts/node.py` reads `poc-config.json`, opens temporary Bastion sessions, checks SSH host fingerprints against OCI console evidence, runs the selected check and closes its sessions. No inference API key needs to be copied into a terminal.

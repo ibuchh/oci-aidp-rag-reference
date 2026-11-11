@@ -338,5 +338,30 @@
       "No cloud deletion was retried and no IAM or application grants were changed during this diagnostic update."
     ],
     "cloud_mutations_executed_by_assistant": false
+  },
+  "cleanup_volume_scope_fix": {
+    "verified_utc": "2026-11-11T21:45:03.286860+00:00",
+    "status": "PASS",
+    "controller_tests_passed": 122,
+    "change": "Supply required catalogKey and fully qualified schemaKey when reconciling a missing RAG volume through ListVolumes.",
+    "checks": [
+      "Fake API now rejects unscoped volume listing, matching the live service.",
+      "Missing volume and deleted-schema resume cases use the owned catalog/schema scope.",
+      "A failed scoped volume listing still blocks cleanup; 403 is never treated as absence.",
+      "Live corrected ListVolumes GET returned an empty collection.",
+      "GET-only full runtime resume preview on a temporary copy of controller records passed with one explicitly selected workspace remaining and no blockers.",
+      "Release integrity verified."
+    ],
+    "live_read_only_preview": {
+      "status": "PASS",
+      "get_requests": 6,
+      "runtime_operations_remaining": 1,
+      "blockers": 0,
+      "mutations": 0
+    },
+    "limitations": [
+      "The previously denied additional-workspace deletion has not been retried by the assistant; its detailed service rejection remains to be captured if it recurs."
+    ],
+    "cloud_mutations_executed_by_assistant": false
   }
 }

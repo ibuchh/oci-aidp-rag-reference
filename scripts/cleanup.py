@@ -301,7 +301,8 @@ class RuntimeCleanup:
                 raise PocError('Native knowledge base belongs to another schema.')
             if volume:
                 vp = '/volumes/'+key(volume['key'])
-                item, _ = self.get(vp, '/volumes', volume['key'])
+                volumes = '/volumes?'+urlencode({'catalogKey': 'default', 'schemaKey': expected})
+                item, _ = self.get(vp, volumes, volume['key'])
                 if item is not None:
                     if item.get('volumeType') != 'MANAGED' or item.get('schemaName') != prefix+'_rag':
                         raise PocError('Refusing to purge an external or mismatched RAG volume.')

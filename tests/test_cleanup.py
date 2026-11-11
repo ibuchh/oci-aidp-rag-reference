@@ -54,6 +54,9 @@ class FakeApi:
         url = urlsplit(path)
         path, query = url.path, parse_qs(url.query)
         if method == 'GET':
+            if path == '/volumes' and not (query.get('catalogKey') and query.get('schemaKey')):
+                raise ApiError(400, 'InvalidParameter', 'fixture-request',
+                               service_message='catalogKey and schemaKey are required')
             if path.startswith('/asyncOperations/'):
                 return {'status':self.async_states[path.rsplit('/',1)[1]]}, {}
             if path.endswith('/files'):
@@ -300,6 +303,37 @@ class CleanupTests(unittest.TestCase):
             return original(method,path,*args,**kwargs)
         with mock.patch.object(self.api,'request',side_effect=hide):
             with self.assertRaises(poc.PocError):controller.preview()
+
+    def test_missing_rag_volume_is_reconciled_with_catalog_and_schema_scope(self):
+        self.api.resources.pop('/volumes/default.fixture_poc_rag.synthetic_documents')
+        report = self.controller().preview()
+        self.assertFalse(report['blockers'])
+        calls = [parse_qs(urlsplit(p).query) for m,p,_,_ in self.api.calls
+                 if m == 'GET' and urlsplit(p).path == '/volumes']
+        self.assertEqual(calls, [{'catalogKey':['default'], 'schemaKey':['default.fixture_poc_rag']}])
+        self.assertFalse(any(o['kind']=='volume-file' for o in report['operations']))
+
+    def test_resume_after_rag_schema_cascade_reconciles_missing_volume(self):
+        self.api.resources.pop('/schemas/default.fixture_poc_rag')
+        self.api.resources.pop('/volumes/default.fixture_poc_rag.synthetic_documents')
+        controller = self.controller()
+        controller.saved.update(target=controller.target, aidp_id=FakeApi.aidp_id,
+            operations={'/schemas/default.fixture_poc_rag':{'status':'DONE'}})
+        controller.save()
+        report = controller.preview()
+        self.assertFalse(report['blockers'])
+        self.assertFalse(any(o['kind'] in ('schema','volume-file') for o in report['operations']))
+        self.assertTrue(all(m=='GET' for m,_,_,_ in self.api.calls))
+
+    def test_volume_lookup_404_does_not_override_failed_scoped_listing(self):
+        self.api.resources.pop('/volumes/default.fixture_poc_rag.synthetic_documents')
+        request = self.api.request
+        def denied(method, path, body=None, **kwargs):
+            if method == 'GET' and urlsplit(path).path == '/volumes':
+                raise ApiError(403, 'NotAllowed', 'fixture-request')
+            return request(method, path, body, **kwargs)
+        self.api.request = denied
+        with self.assertRaises(ApiError):self.controller().preview()
 
     def test_malformed_listing_does_not_certify_absence(self):
         with mock.patch.object(self.api,'request',return_value=({},{})):

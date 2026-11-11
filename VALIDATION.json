@@ -200,11 +200,14 @@
     }
   },
   "documentation_simplification": {
-    "updated_utc": "2026-11-11T16:55:50.000783+00:00",
+    "updated_utc": "2026-11-11T16:57:08.009859+00:00",
     "removed_sections": [
       "Tags (including hashtag lines)",
       "Validation and integrity",
-      "Handover record"
+      "Handover record",
+      "Troubleshooting",
+      "Timing Record",
+      "Files Collected"
     ],
     "scope": "All customer and published Markdown guides; source copies updated to prevent reintroduction.",
     "deployment_code_unchanged": true,

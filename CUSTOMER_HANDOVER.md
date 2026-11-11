@@ -79,22 +79,6 @@ Terraform owns infrastructure and policies. Signed API scripts create the AIDP w
 
 Read [VALIDATION.md](docs/VALIDATION.md) and [VALIDATION.json](VALIDATION.json) for local release checks and their limits. Local validation is not a deployment in your tenancy. Complete the private chat and synthetic tool acceptance in the deployment guide. If RAG is enabled, also require successful native ingestion, all five RAG cases and a cited Playground answer. The sample codes and policies are fictional; they validate retrieval rather than real business facts.
 
-## ⚠️ Troubleshooting
-
-- Broken document link: extract the entire archive, preserve its directory structure and open the extracted guide in a Markdown viewer. Opening a document directly inside an archive preview may prevent navigation.
-- Integrity failure: obtain a fresh complete package before using the source. Do not edit the manifest to hide a mismatch.
-- Deployment or cleanup failure: keep state and inventories and use the relevant guide's troubleshooting section.
-
 ## 🔄 Rollback
 
 Reading, extracting and verifying the package does not deploy resources. After a deployment begins, use the deployment recovery guidance or the complete cleanup guide. Do not delete state to resolve a failed phase.
-
-## 📝 Timing Record
-
-Record baseline readiness, AI Compute readiness, native KB creation, document upload, ingestion completion, both agents' acceptance and the cleanup/retention deadlines. Assign an owner for state backups, certificate renewal and final deletion verification.
-
-## 📦 Files Collected
-
-Keep customer-generated credentials, configuration, state, inventories and acceptance records in protected customer-controlled storage. They are not part of this source handover.
-
-RAG records are under `deployments/NAME/rag/`: `inventory.json`, uploaded-file hashes, `requests/`, `last-response.json`, generated agent source and `rag-acceptance.json`. Save native ingestion job IDs and outcomes separately. Responses and acceptance reports contain document excerpts; protect them alongside state. Generated account-specific source and live records do not belong in the generic handover ZIP.

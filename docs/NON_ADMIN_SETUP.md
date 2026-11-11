@@ -201,20 +201,8 @@ OCI policies and AIDP application permissions are separate. Verify workspace/AI 
 - Complete private chat and observed synthetic-tool acceptance from AI Compute, as described in the deployment guide.
 - Record any customer-required policy adjustments. This policy baseline has not been applied or live-tested in the customer's tenancy as part of documentation preparation.
 
-## ⚠️ Troubleshooting
-
-- Authorization error: check the actual profile user, domain-group membership, policy scope, propagation and applicable security controls.
-- Wrong target: correct the profile/region before setup. Never retarget an existing deployed state to another account or region.
-- Image access error: verify region, image availability, shape compatibility and source-compartment permissions.
-- Policy creation denied for the operator: use the documented administrator stage; do not add broad policy-management privileges as a workaround.
-- Identity creation is centrally managed: have the customer's identity team perform the equivalent approved provisioning in the chosen domain.
-
 ## 🔄 Rollback and cleanup ownership
 
 Agree on teardown ownership before provisioning. The documented full destroy runner requires rights to remove both infrastructure and POC policies; a customer-authorized cleanup identity can run it, or the administrator and operator must coordinate staged deletion. Preserve service permissions until AIDP completes dependent cleanup. Follow [CLEANUP.md](CLEANUP.md).
 
 After cleanup is verified, the administrator can remove this deployment-access policy, remove the user's POC membership and disable the temporary user according to customer policy. The stack's destroy command intentionally retains the pre-created compartment, user and group. Do not delete those identities or revoke access while cleanup still needs them.
-
-## 📦 Files Collected
-
-Record domain name, user/group/compartment OCIDs, approved region and home region, policy OCID, reviewed policy text, setup/preflight results and the named cleanup owner. Protect subsequent configuration, credentials, state and resource inventories in customer-controlled storage.

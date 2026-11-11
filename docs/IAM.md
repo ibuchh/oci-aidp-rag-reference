@@ -118,7 +118,3 @@ Record policy IDs and attachments; verify applicable denies, exact AIDP/secret/k
 Agree on the cleanup identity before provisioning. The final destroy runner must be authorized to delete all owned resources, including root/compartment POC policies. Where approved, run the documented destroy command with `--config poc-config.admin.json` using that authorized teardown profile.
 
 If no single identity has those rights, the customer IAM administrator must coordinate staged deletion with the infrastructure owner and preserve each root's state. Do not remove service policies before AIDP finishes service-side storage cleanup. The supplied end-to-end destroy script expects its executing identity to have all required deletion permissions; it does not delegate API calls to another identity automatically.
-
-## 📦 Files Collected
-
-Keep reviewed policy plans, policy IDs, canonical IAM states and administrator config in protected customer storage. No policy-management rights need to be granted to the POC operator solely to avoid this administrator workflow.

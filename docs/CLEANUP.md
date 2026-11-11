@@ -170,26 +170,6 @@ Expected: zero managed resource records in the package's deployed roots, unless 
 
 Public apps and inference must stop serving. An empty state alone does not prove untracked/manual resources or retained backups were deleted. Retention can require a later customer follow-up.
 
-## ⚠️ Troubleshooting
-
-- RAG KB/source busy: finish or cancel the specific ingestion job before deleting its dependencies. Keep Spark compute and Lakehouse available until native cleanup completes.
-- AI Compute still attached: inspect both agents, Playground TEST runtimes and prior endpoint versions before retrying deletion.
-- KB removed but original documents remain: KB/source vectors and managed source files have separate lifecycles; inspect the recorded volume and retained objects.
-- Subnet in use: identify the exact AIDP/compute/database endpoint holding it and finish supported deletion; do not remove arbitrary VNICs.
-- IAM authorization error: use the agreed permitted cleanup identity; an allow cannot override an applicable deny.
-- Active inference secret: complete step 3. A recorded secret that has already disappeared requires administrator reconciliation of ownership/permissions before retrying; do not erase the record blindly.
-- Failed deletion: preserve canonical state and command logs, resolve the exact dependency and resume. Do not use `terraform state rm` to manufacture completion.
-- Retained boot volume: keep `.pocctl/inventory.json`; it records which volumes the cleanup owns.
-- Vault/key pending: respect retention/dependencies and recheck after the deadline. Do not infer service-side deletion from state removal.
-
 ## 🔄 Rollback
 
 Cancel before apply to leave resources intact. After deletion starts, restore from actual retained backups/images where supported. Recreating Terraform resources does not restore deleted model, metrics, database or original document data. Rebuild a removed RAG KB only from backed-up originals, re-ingest them and rerun acceptance; embeddings, hashes and acceptance reports are not source-document backups. RAG-only rollback must leave baseline dependencies intact. Pending secret deletion can be canceled through OCI before its deadline if the customer deliberately chooses recovery.
-
-## 📝 Timing Record
-
-Record cleanup start/end, RAG endpoint detachment, ingestion stop, source/vector deletion, original-document disposition, baseline runtime removal, database termination, disk cleanup and each Vault/key/secret retention deadline. Assign the final retention check to a named customer owner.
-
-## 📦 Files Collected
-
-Keep protected state snapshots, source/config version, reviewed plans/logs, baseline and RAG data-plane inventories, native ingestion records, original-document backups, retained-volume inventories, acceptance records and a list of intentionally retained resources with owner/follow-up date. Archive retired deployment records only after reconciling cleanup. Never reuse a retired AIDP inventory for a new instance.

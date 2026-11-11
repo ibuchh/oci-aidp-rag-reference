@@ -91,25 +91,6 @@ This uses the same inference stack through Bastion and opens a local Streamlit s
 
 Run `gpu-health`, `monitoring-health`, `chat` and `tool-test`; open both public URLs; verify a browser session can chat and an unauthenticated request cannot open Streamlit. During load, confirm request/token metrics and both GPU series change. During AIDP testing, additionally verify actual requests from its private managed runtime.
 
-## ⚠️ Troubleshooting
-
-- Bastion failure: check profile/region, egress `/32`, session status and key pair. Keep verification enabled.
-- Inference timeout or 503: inspect model readiness, FSS mount, container logs and GPU memory.
-- Streamlit 401: use the dedicated Streamlit credentials, separate from Grafana's `admin` login.
-- Streamlit 502: inspect the app container and loopback `/_stcore/health` before changing public rules.
-- Empty dashboards: verify scrape targets and correct time range before generating more load.
-- TLS failure after several weeks: the initial GPU self-signed certificate expires after 30 days. Plan coordinated renewal and re-distribute its public certificate; public ACME certificates have a separate automatic renewal path.
-
-For advanced host diagnosis, use `scripts/bastion-tunnel.py --help` with the generated `.pocctl/outputs.json` and `.pocctl/known_hosts`. Always pass the configured profile, region, key, context and target explicitly. The target labels in this package are `vllm` and `monitoring`.
-
 ## 🔄 Rollback
 
 Stop synthetic traffic first. A failed Streamlit installation leaves inference/monitoring infrastructure available for repair. Before tearing down the stack, follow [CLEANUP.md](CLEANUP.md), including AIDP dependencies and recorded secrets.
-
-## 📝 Timing Record
-
-Record load start/end, request cap, phase/concurrency, observed failures, peak waiting requests and latency percentiles. Save model/runtime versions alongside any performance result.
-
-## 📦 Files Collected
-
-Keep sanitized health results, load `summary.json`, relevant dashboard captures and failure logs. Avoid collecting login files, API keys or full prompts in shared diagnostics.

@@ -145,40 +145,11 @@ Check the actual workspace subnet/NSG, Active compute, matching agent `computeKe
 
 After publishing inference, use `invoke-inference` for checks. `bootstrap`, `upload-probe` and `redeploy-probe` are preparation/debugging actions, not routine inference health checks. Replacing the entry with the probe changes what the agent executes.
 
-## ⚠️ Troubleshooting
-
-- HTTP 401/403 on the AIDP API: check profile authentication, region, tenancy and AIDP permissions.
-- HTTP 404 on the data-plane host: use the official CLI’s `aidp.REGION.oci.oraclecloud.com` gateway. The SDK’s `datahub-dp` gateway returned 404 in the reference tenancy.
-- Native file upload: the notebook-content API returned HTTP 500 for directory creation here. Source upload uses the workspace-object binary API with absolute `/Workspace/Shared/...` paths. OCI `raw-request` only handles JSON bodies, so the binary helper uses the existing OCI SDK.
-- Compute `Installing software`: the service has allocated the runtime but is still initializing it. Poll the same resource; do not create a second compute as a retry.
-- Direct private-IP timeout: the observed managed runtime uses Data Flow compute. Oracle documents FQDN-based private-endpoint access and restrictions on direct private-IP use. Validate the private DNS path and TLS hostname instead of exposing vLLM publicly.
-- Advanced `dnsZones` unavailable: this is a tenancy/service capability response. Do not repeatedly stop compute or weaken isolation. Test the default resolver path, retain the exact request ID, and involve the AIDP architect if it fails.
-- Vault reference failure: verify the exact AIDP instance/secret policy, propagation and the Credential Store name. Do not grant the Oracle-managed cluster broad access or upload administrator API signing keys.
-- Vault-reference lookup: in the deployed runtime, `aidputils.secrets.get(name=...)` returns `secretId` and `secretContentBase64`. The client checks the intended secret ID and decodes Base64 in runtime memory. Passing the `VaultSecretReference` key selector returned HTTP 400 in the reference environment. No secret payload is printed or embedded in source.
-- Existing name without local ownership inventory: restore the matching inventory or explicitly reconcile the exact owned resource before retrying. No automatic adoption of unrelated resources is performed.
-- Interrupted create: the retry token is saved before POST. A successful credential-create response can be empty; the script then resolves its exact metadata key. If interrupted before recording the key, reconcile the named item and owner before retrying.
-- Redeploy name conflict: the update omits an unchanged display name. Reusing the existing name explicitly caused HTTP 409 in this service.
-- Another setup running: the local lock prevents concurrent inventory mutations. Wait for the existing command to finish.
-
 ## 🔄 Rollback
 
 Read `deployments/NAME/aidp-workspace.json`. Remove its owned deployed endpoints, agent and AI Compute before removing the private workspace. Include `previous_deployments` if a redeploy generated a new key. Remove only the recorded synthetic Credential Store item and Vault-reference item. Preserve unrelated workspaces and default Master Catalog compute.
 
 These data-plane resources are separate from Terraform. After their cleanup, follow [CLEANUP.md](CLEANUP.md) for the Vault secret, scoped policy, private DNS and infrastructure. Preserve the working standalone vLLM stack when troubleshooting only AIDP.
-
-## ⏱️ Timing Record
-
-Record workspace creation, private attachment, AI Compute software installation/start, probe execution, first private chat and first verified tool round trip separately. Timing is service-dependent; observed initialization is not a fixed service guarantee.
-
-## 📁 Files Collected
-
-- `deployments/NAME/aidp-workspace.json`: owned identifiers, retry intents and Credential Store metadata.
-- `deployments/NAME/runtime-identity.json`: recognized metadata-only probe result.
-- `deployments/NAME/runtime/inference_agent.generated.py`: generated source for review, with public trust and credential names only.
-- `deployments/NAME/aidp-inference-acceptance.json`: private-chat and observed-tool proof.
-- Terraform states and reviewed plans for `aidp-dns` and `aidp-credential-iam`.
-
-Do not collect RP tokens, passwords, key contents, secret bundle values or customer prompts.
 
 ## 📚 Sources
 

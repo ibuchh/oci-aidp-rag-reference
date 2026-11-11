@@ -280,29 +280,6 @@ python3 scripts/aidp_workspace.py playground-status
 
 This reads service metadata and updates the local inventory; it does not certify chat. If Playground returns `SIGNER_AVAILABLE` or older probe JSON, deselect its Playground compute, reselect the same existing compute with **Select & Deploy**, wait for Active and start a new session. Keep the published endpoint. Use the same refresh procedure for stale RAG test code, then ask a cited sample question.
 
-## ⚠️ Troubleshooting
-
-- Preserve config, state, host evidence and inventory after any failed phase. Retry the same phase after resolving its cause.
-- SSH exit 255 or `ssh-keyscan` failure: check the actual configured SSH egress, key pair, temporary Bastion session and guest SSH/cloud-init readiness. Keep host verification enabled; preserve the run log for the failing command.
-- GPU/model startup: check cloud-init completion, driver/container visibility and FSS mount before recreating a VM.
-- Missing service policies: use the authorized customer IAM administrator and check governance denies and propagation.
-- Private-IP access from AI Compute fails: the supported route uses private `inference.lab` DNS. Do not expose the model publicly.
-- Lost data-plane inventory: restore the matching file. Automatic adoption of unrelated named resources is deliberately rejected.
-- RAG retrieval failure: confirm the schema/KB identity, native ingestion outcome, runtime helper compatibility and catalog access. No chunks means the agent stops instead of generating an unsupported answer.
-- RAG upload collision: a same-named remote file without recorded upload ownership is not overwritten automatically; reconcile its owner before retrying.
-- RAG deployment still CREATING: wait on the recorded endpoint and run `verify`, rather than rerunning `connect` to republish.
-- Use `invoke-inference` for routine checks after publication. Diagnostic probe-upload commands replace the deployed model entry.
-
 ## 🔄 Rollback
 
 Successful phases remain available for diagnosis. If the customer elects to remove the stack, use [CLEANUP.md](CLEANUP.md), including its explicit AIDP runtime and retention steps. Do not erase state or manually remove lifecycle protections to force an apply.
-
-## 📝 Timing Record
-
-Record UTC start/end for network/FSS, GPU bootstrap/model download, public HTTPS, Lakehouse, AIDP readiness, AI Compute installation and first baseline acceptance PASS, RAG upload, native ingestion and RAG endpoint/Playground acceptance. Timings depend on region, capacity and downloads.
-
-## 📦 Files Collected
-
-Protect `poc-config.json`, Terraform states, plans/logs, `.pocctl` application logins, `aidp-workspace.json`, `runtime-identity.json`, `aidp-inference-acceptance.json` and runtime secret metadata. Retain them in customer-controlled storage through final cleanup verification.
-
-For RAG, also preserve `rag/inventory.json`, native source/job identifiers, file hashes, `rag/rag-acceptance.json`, request records and the generated entry file. Reports and responses contain document excerpts and must stay in protected customer storage. Keep a separate backup of original documents; hashes and vectors do not replace it.

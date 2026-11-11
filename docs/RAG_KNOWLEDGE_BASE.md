@@ -154,15 +154,6 @@ Local tests require the baseline agent dependencies, including LangGraph:
 python3 -m unittest discover -s integration/rag/tests -v
 ```
 
-## ⚠️ Troubleshooting
-
-- Empty retrieval: check the correct KB/schema and successful ingestion. The agent stops rather than asking the LLM to invent an answer without documents.
-- Retrieval error: inspect the AIDP runtime's RAG/Oracle connection error and catalog permissions. Database credentials are used only inside AI Compute; never print or export the vector-store credential response.
-- Model error: check private DNS, TLS validity, the existing Vault reference and GPU API health.
-- Runtime upgrade: rerun local and live acceptance. The retrieval adapter imports the same platform helpers used by AIDP RAGTool; their interfaces are not independently pinned by this source package.
-- Authentication: CLI requests need the existing approved profile; public vLLM exposure or disabled TLS verification is not required.
-- Ownership error: preserve `rag/inventory.json` and reconcile the specific create intent. Do not adopt arbitrary similarly named resources.
-
 ## 🔄 Rollback and teardown
 
 Use [CLEANUP.md](CLEANUP.md) step **2a** for RAG-only removal: undeploy every RAG endpoint version, detach its Playground test runtime/agent, stop ingestion, remove the KB source/vectors and KB, then remove owned original files/volume, the empty dedicated schema and the exact RAG code folder. Confirm ownership from `rag/inventory.json` and preserve its evidence.
@@ -170,13 +161,3 @@ Use [CLEANUP.md](CLEANUP.md) step **2a** for RAG-only removal: undeploy every RA
 Stop after that section for RAG-only removal. Keep the baseline agent, shared AI Compute/workspace, ingestion compute, Credential Store, inference secret, DNS, Lakehouse, GPU/FSS and monitoring. Recheck baseline inference. Continue the remaining cleanup phases only for a deliberately chosen whole-stack teardown. No automatic native KB destroy command is supplied.
 
 Deleted vectors can be rebuilt only when the original documents are available. Re-upload/re-ingest the backed-up originals and rerun RAG acceptance; hashes or generated agent source do not restore documents.
-
-## 📝 Timing Record
-
-Record KB creation, source upload, ingestion start/success, endpoint readiness and live acceptance timestamps. Runtime deployment and embedding ingestion are independent readiness gates.
-
-## 📦 Files Collected
-
-Source documents, source hashes, `rag/inventory.json`, native-ingestion screenshot, runtime diagnostic results, previous deployment IDs, `last-response.json` and `rag-acceptance.json`. Generated account-specific source and runtime library diagnostic files are deployment records, not generic handover artifacts.
-
-Oracle references: [Knowledge bases](https://docs.oracle.com/en/cloud/paas/ai-data-platform/aidug/knowledge-bases.html), [RAG tools](https://docs.oracle.com/en/cloud/paas/ai-data-platform/aidug/agent-flow-tools.html), [Public SDK](https://github.com/oracle/aidataplatform-sdk).

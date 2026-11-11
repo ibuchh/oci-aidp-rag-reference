@@ -22,8 +22,11 @@ from poc import ROOT, PocError, output, private_json, read_config, target_check
 
 
 class ApiError(PocError):
-    def __init__(self, status, code, request_id):
+    def __init__(self, status, code, request_id, service_message=None):
         self.status = status
+        self.code = code
+        self.request_id = request_id
+        self.service_message = service_message
         super().__init__(f'AIDP API returned HTTP {status}, code={code}, request-id={request_id}')
 
 
@@ -86,7 +89,8 @@ class Api:
         headers = {k.lower(): v for k, v in envelope.get('headers', {}).items()}
         data = envelope.get('data') or {}
         if not 200 <= status < 300:
-            raise ApiError(status, data.get('code', 'unknown'), headers.get('opc-request-id', 'unavailable'))
+            raise ApiError(status, data.get('code', 'unknown'), headers.get('opc-request-id', 'unavailable'),
+                           service_message=data.get('message'))
         return data, headers
 
     def get(self, path):

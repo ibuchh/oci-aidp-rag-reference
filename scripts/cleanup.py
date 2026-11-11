@@ -156,6 +156,16 @@ class RuntimeCleanup:
     def request(self, method, path, body=None, **kwargs):
         try:
             return self.api.request(method, path, body, **kwargs)
+        except ApiError as error:
+            if error.status != 404:
+                diagnostic = self.folder/'cleanup'/'last-api-error.json'
+                # Never capture request bodies, authorization headers or credentials.
+                private_json(diagnostic, {'method': method, 'path': path, 'http_status': error.status,
+                    'code': error.code, 'request_id': error.request_id,
+                    'service_message': error.service_message, 'recorded_utc': utc()})
+                error.args = (str(error)+' during '+method+' '+path+
+                              '. Private service error: '+str(diagnostic),)
+            raise
         except subprocess.TimeoutExpired:
             raise PocError('AIDP cleanup request timed out. Keep the journal and rerun the same command to reconcile it.') from None
 

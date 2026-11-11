@@ -321,5 +321,22 @@
     ],
     "cloud_commands_executed": false,
     "deployment_code_changed": false
+  },
+  "cleanup_error_diagnostics": {
+    "verified_utc": "2026-11-11T20:35:09.487720+00:00",
+    "status": "PASS",
+    "controller_tests_passed": 119,
+    "change": "Preserve detailed service messages privately for rejected cleanup requests, display the denied method/resource path and diagnostic file location, and retain strict failure guards.",
+    "checks": [
+      "AIDP error details remain absent from terminal exception text.",
+      "A denied additional-workspace DELETE records a mode-0600 diagnostic without request bodies or headers.",
+      "Denied deletion leaves the workspace journal at INTENT and runtime unverified, without secret scheduling.",
+      "All cleanup shell blocks parse in Bash and Zsh; local Markdown links and release integrity verified."
+    ],
+    "limitations": [
+      "The service reason for the previously observed workspace NotAllowed response was discarded by the older client and remains unresolved.",
+      "No cloud deletion was retried and no IAM or application grants were changed during this diagnostic update."
+    ],
+    "cloud_mutations_executed_by_assistant": false
   }
 }

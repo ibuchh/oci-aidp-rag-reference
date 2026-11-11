@@ -42,6 +42,20 @@ class WorkspaceTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.addCleanup(lambda: [p.stop() for p in reversed(self.patches)])
 
+    def test_api_retains_service_error_without_printing_it(self):
+        (self.root/'.local').mkdir()
+        response = Mock(returncode=0, stdout=json.dumps({'status':'403 Forbidden',
+            'data':{'code':'NotAllowed','message':'fixture private service explanation'},
+            'headers':{'opc-request-id':'fixture-request'}}))
+        with patch.object(module, 'output', return_value={'aidp_id':'fixture-aidp'}), \
+                patch.object(module.subprocess, 'run', return_value=response):
+            api = module.Api({'region':'us-ashburn-1','oci_profile':'fixture'})
+            with self.assertRaises(module.ApiError) as caught:
+                api.request('DELETE','/workspaces/fixture')
+        self.assertEqual(caught.exception.service_message,'fixture private service explanation')
+        self.assertEqual(caught.exception.code,'NotAllowed')
+        self.assertNotIn('fixture private service explanation',str(caught.exception))
+
     def test_plan_does_not_mutate_cloud_or_write_inventory(self):
         w = module.Workspace(self.cfg, self.api)
         self.assertIn('planned', w.workspace())

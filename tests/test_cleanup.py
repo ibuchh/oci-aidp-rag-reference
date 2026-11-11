@@ -201,6 +201,28 @@ class CleanupTests(unittest.TestCase):
         with self.assertRaises(poc.PocError): controller.execute()
         self.assertIn('/workspaces/ws/agents/rag', self.api.resources)
 
+    def test_denied_extra_workspace_deletion_records_private_service_reason_and_stops(self):
+        self.api.resources['/workspaces/extra'] = {'key':'extra','displayName':'fixture-extra','type':'USER'}
+        request = self.api.request
+        def denied(method, path, body=None, **kwargs):
+            if method == 'DELETE' and path == '/workspaces/extra':
+                raise ApiError(403, 'NotAllowed', 'fixture-request', service_message='fixture service restriction')
+            return request(method, path, body, **kwargs)
+        self.api.request = denied
+        controller = self.controller(additional_workspaces=['extra']); controller.preview()
+        with self.assertRaises(ApiError) as caught: controller.execute()
+        self.assertIn('DELETE /workspaces/extra', str(caught.exception))
+        self.assertNotIn('fixture service restriction', str(caught.exception))
+        diagnostic = self.folder/'cleanup/last-api-error.json'
+        data = json.loads(diagnostic.read_text())
+        self.assertEqual(data['service_message'], 'fixture service restriction')
+        self.assertEqual(data['request_id'], 'fixture-request')
+        self.assertEqual(diagnostic.stat().st_mode & 0o777, 0o600)
+        self.assertFalse(controller.saved['runtime_verified'])
+        self.assertIn('/workspaces/extra', self.api.resources)
+        self.assertEqual(controller.saved['operations']['/workspaces/extra']['status'], 'INTENT')
+        self.assertNotIn('secret', controller.saved)
+
     def test_resume_after_lost_delete_response_does_not_repeat_completed_deletion(self):
         controller = self.controller();controller.preview()
         self.api.interrupt_after_delete = '/workspaces/ws/agents/rag/deployments/rag-prod'

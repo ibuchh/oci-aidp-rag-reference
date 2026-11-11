@@ -95,6 +95,8 @@ Progress is recorded under `deployments/NAME/cleanup/journal.json`. Accepted asy
 
 A failed runtime cleanup prevents inference-secret scheduling and infrastructure apply. A failed backup prevents all automated deletions. Authentication/authorization failures are not treated as missing resources; an HTTP 404 requires a successful parent listing to establish absence. Service dependency conflicts or unsupported API behavior stop cleanup instead of bypassing runtime verification.
 
+If an AIDP request is rejected, the error identifies the HTTP method and resource path. Read `deployments/NAME/cleanup/last-api-error.json` locally for the service's detailed message, status and request ID. This private file excludes request bodies and authorization headers; keep it out of GitHub and customer ZIPs. `403 NotAllowed` alone does not establish the cause: check the service message and the exact workspace's application permissions before changing IAM. Resolve the reported restriction, then rerun the same apply command; do not mark a denied deletion as complete or erase its journal entry.
+
 ### 3. Verify completion and secret retention
 
 The automated apply handles both kinds of recorded credentials:

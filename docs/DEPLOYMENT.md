@@ -204,7 +204,7 @@ python3 integration/rag/rag.py status \
   --config "$CONFIG"
 ```
 
-Expected: `default.POC_PREFIX_rag` and its `synthetic_documents` managed volume are ACTIVE. If creation was accepted but the schema or volume is not yet visible, inspect the asynchronous operation in AIDP and rerun the same `prepare` command after it succeeds. Keep `rag/inventory.json`; do not adopt an unrelated resource with the same name.
+Expected: `default.POC_PREFIX_rag` and its `synthetic_documents` managed volume are ACTIVE. If creation was accepted but the schema or volume is not yet visible, `prepare` prints a pending-discovery message and retains its accepted request. `status` reports the saved asynchronous operation even before a resource key is recorded. Rerun the same `prepare` command after readiness to reconcile the owned schema and continue with its volume; no second create is submitted for an accepted pending request. A pending message does not mean both resources are ready for upload. Failed/canceled operations, changed intents and ambiguous ownership remain errors. Keep `rag/inventory.json`; do not adopt an unrelated resource with the same name.
 
 Then upload the three bundled synthetic TXT files:
 

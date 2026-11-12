@@ -35,4 +35,6 @@ def main():
         run('rag_poc.py','invoke','--query',args.query)
     else:run('rag_poc.py',args.action,*(['--apply'] if args.apply else []))
 
-if __name__=='__main__':main()
+if __name__=='__main__':
+    try:main()
+    except subprocess.CalledProcessError as error:raise SystemExit(error.returncode or 1)

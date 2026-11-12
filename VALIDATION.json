@@ -491,5 +491,26 @@
     ],
     "workload_mutations_executed_by_assistant": false,
     "verified_utc": "2026-11-12T12:41:30.540509+00:00"
+  },
+  "rag_pending_create": {
+    "status": "PASS",
+    "controller_tests_passed": 162,
+    "rag_tests_passed": 21,
+    "cause": "An accepted asynchronous schema create returned no resource key and was not immediately visible in the collection. The saved operation subsequently succeeded and the exact owned schema became ACTIVE.",
+    "change": "Treat accepted pending-discovery schema/volume preparation as resumable. Report saved async operation status before a resource key exists, preserve ownership/retry tokens and reject failed/canceled operations, changed intents and ambiguous resources. Retain operation key when reconciling. Preserve child CLI exit status without a redundant parent traceback.",
+    "checks": [
+      "All 21 RAG tests and 162 controller tests passed.",
+      "Repeated accepted-pending preparation never sends another POST; later discovery reconciles the same accepted intent.",
+      "Pending status performs read-only GETs and does not modify inventory.",
+      "Failed/canceled operations, changed intents, ambiguous matches and clean CLI failure covered.",
+      "Live GETs confirmed CREATE_SCHEMA SUCCEEDED and exact expected schema ACTIVE. Updated status output verified against the live saved operation without changing inventory.",
+      "Release manifests, syntax, document links and future handover build checked."
+    ],
+    "limitations": [
+      "The assistant issued read-only AIDP requests only. The operator must rerun prepare to reconcile schema ownership and create the managed volume.",
+      "Pending preparation is not a signal to upload until both resources are ACTIVE."
+    ],
+    "workload_mutations_executed_by_assistant": false,
+    "verified_utc": "2026-11-12T14:51:32.337796+00:00"
   }
 }

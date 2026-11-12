@@ -26,6 +26,10 @@ from private_transport import validate_correlation_id
 VOLUME = 'synthetic_documents'
 
 
+class PendingCreate(PocError):
+    """An accepted owned create is awaiting discovery, not another POST."""
+
+
 class RagPoc:
     def __init__(self, config):
         self.cfg = read_config(config)
@@ -50,6 +54,28 @@ class RagPoc:
     def save(self):
         private_json(self.inventory_path, self.saved)
 
+    def pending_create_status(self, kind):
+        accepted = self.saved.get('create_responses', {}).get(kind)
+        intent = self.saved.get('create_intents', {}).get(kind, {})
+        details = {'displayName': intent.get('body', {}).get('displayName'),
+                   'create_status': 'ACCEPTED' if accepted else 'UNCONFIRMED'}
+        operation = (accepted or {}).get('headers', {}).get('aidp-async-operation-key')
+        if operation:
+            info = self.api.get('/asyncOperations/' + quote(operation, safe=''))
+            details.update(async_operation_key=operation, operation_status=info.get('status'),
+                           resource_name=info.get('resourceName'), error_code=info.get('errorCode'))
+        return details
+
+    def pending_create(self, kind):
+        details = self.pending_create_status(kind)
+        status = details.get('operation_status', 'ACCEPTED')
+        if status in ('FAILED', 'CANCELED'):
+            raise PocError(f'Owned {kind} create operation {status}; inspect operation '
+                           f'{details["async_operation_key"]}. Inventory retained; no replacement create submitted.')
+        operation = details.get('async_operation_key', 'not returned')
+        raise PendingCreate(f'Owned {kind} create is still pending discovery (operation {operation}, status {status}). '
+                            'Rerun the same prepare command after readiness; no second create was submitted.')
+
     def create(self, kind, path, body, collision_path):
         found = self.saved['resources'].get(kind)
         if found:
@@ -58,6 +84,8 @@ class RagPoc:
                    if item.get('displayName') == body['displayName']]
         intent = self.saved.get('create_intents', {}).get(kind)
         accepted = self.saved.get('create_responses', {}).get(kind)
+        if accepted and intent != {'path': path, 'body': body}:
+            raise PocError('Accepted RAG create intent differs from this request; inspect the retained inventory.')
         if matches:
             if len(matches) != 1 or not accepted or intent != {'path': path, 'body': body}:
                 raise PocError('Name already exists without RAG ownership: ' + body['displayName'])
@@ -65,10 +93,13 @@ class RagPoc:
             self.saved['resources'][kind] = {'key': item['key'], 'name': body['displayName'],
                 'resource_path': (self.saved['resources']['agent']['resource_path']+'/deployments/'+quote(item['key'],safe='')
                                   if kind=='deployment' else path+'/'+quote(item['key'],safe=''))}
+            operation = accepted.get('headers', {}).get('aidp-async-operation-key')
+            if operation:
+                self.saved['resources'][kind]['async_operation_key'] = operation
             self.save()
             return item
         if accepted:
-            raise PocError('Owned create is still pending. Check its asynchronous operation, then rerun prepare; no second create was submitted.')
+            self.pending_create(kind)
         token = self.saved['tokens'].setdefault(kind, str(uuid.uuid4()))
         self.saved.setdefault('create_intents', {})[kind] = {'path':path, 'body':body}
         self.save()
@@ -79,8 +110,10 @@ class RagPoc:
         self.save()
         if not item.get('key'):
             matches = [i for i in self.api.items(collision_path) if i.get('displayName') == body['displayName']]
+            if not matches:
+                self.pending_create(kind)
             if len(matches) != 1:
-                raise PocError('Create accepted without a discoverable unique key; inspect owned create intent.')
+                raise PocError('Accepted RAG create matches multiple resources; inspect the retained intent before continuing.')
             item = matches[0]
         key = item['key']
         resource_path = (path + '/' + quote(key, safe='') if kind != 'deployment' else
@@ -92,6 +125,12 @@ class RagPoc:
         return item
 
     def prepare(self):
+        try:
+            self.prepare_resources()
+        except PendingCreate as error:
+            print(str(error), flush=True)
+
+    def prepare_resources(self):
         schema = self.create('schema', '/schemas', {
             'displayName': self.schema, 'catalogName': 'default',
             'description': 'Synthetic vLLM/AIDP RAG POC; owned by integration/rag'},
@@ -188,6 +227,11 @@ class RagPoc:
         for kind, record in self.saved['resources'].items():
             item = self.api.get(record['resource_path'])
             print(kind, json.dumps({k:item.get(k) for k in ['key','displayName','lifecycleState','state','endpointUrl']}))
+        pending = set(self.saved.get('create_intents', {})) - set(self.saved['resources'])
+        for kind in sorted(pending):
+            print(kind, json.dumps(self.pending_create_status(kind)), flush=True)
+        if not self.saved['resources'] and not pending:
+            print('No RAG resources or create intents recorded. Run prepare --apply to begin.', flush=True)
 
     def wait(self, timeout=600):
         deadline=time.monotonic()+timeout

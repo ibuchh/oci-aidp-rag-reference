@@ -1,9 +1,13 @@
 import asyncio
 import base64
+import contextlib
 import importlib.util
+import io
 import json
 from pathlib import Path
 import sys
+import runpy
+import subprocess
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -12,7 +16,7 @@ from unittest.mock import Mock, patch
 HERE=Path(__file__).resolve().parents[1]
 sys.path[:0]=[str(HERE),str(HERE.parent/'aidp')]
 import rag_agent
-from rag_poc import RagPoc, PocError
+from rag_poc import RagPoc, PocError, PendingCreate
 from render_rag import render
 from verify_rag import check
 
@@ -122,6 +126,87 @@ class RagTests(unittest.TestCase):
             with self.assertRaisesRegex(PocError,'still pending'):
                 poc.create('schema','/schemas',body,'/schemas')
             poc.api.request.assert_not_called()
+
+    def test_accepted_async_prepare_is_resumable_without_duplicate_post(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            poc=object.__new__(RagPoc);poc.schema='fixture_rag'
+            poc.inventory_path=Path(tmp)/'inventory.json';poc.saved={'resources':{},'tokens':{}}
+            poc.api=Mock();poc.api.items.return_value=[]
+            poc.api.request.return_value=({}, {'aidp-async-operation-key':'operation-fixture'})
+            poc.api.get.return_value={'status':'IN_PROGRESS','resourceName':'default.fixture_rag'}
+            output=io.StringIO()
+            with contextlib.redirect_stdout(output):poc.prepare()
+            self.assertIn('still pending discovery',output.getvalue())
+            self.assertIn('IN_PROGRESS',output.getvalue())
+            self.assertEqual(poc.api.request.call_count,1)
+            token=poc.saved['tokens']['schema']
+            with contextlib.redirect_stdout(io.StringIO()):poc.prepare()
+            self.assertEqual(poc.api.request.call_count,1)
+            self.assertEqual(poc.saved['tokens']['schema'],token)
+            poc.api.items.return_value=[{'key':'default.fixture_rag','displayName':'fixture_rag','lifecycleState':'ACTIVE'}]
+            body=poc.saved['create_intents']['schema']['body']
+            item=poc.create('schema','/schemas',body,'/schemas?catalogKey=default')
+            self.assertEqual(item['lifecycleState'],'ACTIVE')
+            self.assertEqual(poc.saved['resources']['schema']['async_operation_key'],'operation-fixture')
+            self.assertEqual(poc.api.request.call_count,1)
+
+    def test_pending_status_reports_async_operation_without_writing_inventory(self):
+        poc=object.__new__(RagPoc);poc.api=Mock();poc.save=Mock()
+        poc.saved={'resources':{},'create_intents':{'schema':{'body':{'displayName':'fixture'}}},
+                   'create_responses':{'schema':{'headers':{'aidp-async-operation-key':'fixture-op'}}}}
+        poc.api.get.return_value={'status':'SUCCEEDED','resourceName':'default.fixture','errorCode':''}
+        output=io.StringIO()
+        with contextlib.redirect_stdout(output):poc.status()
+        self.assertIn('SUCCEEDED',output.getvalue());self.assertIn('fixture-op',output.getvalue())
+        poc.api.get.assert_called_once_with('/asyncOperations/fixture-op')
+        poc.api.request.assert_not_called();poc.save.assert_not_called()
+        self.assertEqual(poc.saved['resources'],{})
+
+    def test_failed_async_prepare_remains_an_error_without_replacement_create(self):
+        for status in ('FAILED','CANCELED'):
+            poc=object.__new__(RagPoc);poc.schema='fixture';poc.api=Mock()
+            body={'displayName':'fixture','catalogName':'default',
+                  'description':'Synthetic vLLM/AIDP RAG POC; owned by integration/rag'}
+            poc.saved={'resources':{},'create_intents':{'schema':{'path':'/schemas','body':body}},
+                       'create_responses':{'schema':{'headers':{'aidp-async-operation-key':'fixture-op'}}}}
+            poc.api.items.return_value=[];poc.api.get.return_value={'status':status}
+            with self.subTest(status=status),self.assertRaisesRegex(PocError,status):poc.prepare()
+            poc.api.request.assert_not_called()
+
+    def test_changed_accepted_intent_is_rejected_even_before_resource_visibility(self):
+        poc=object.__new__(RagPoc);poc.api=Mock();poc.api.items.return_value=[]
+        poc.saved={'resources':{},'create_intents':{'schema':{'path':'/schemas','body':{'displayName':'original'}}},
+                   'create_responses':{'schema':{'headers':{}}}}
+        with self.assertRaisesRegex(PocError,'intent differs'):
+            poc.create('schema','/schemas',{'displayName':'changed'},'/schemas')
+        poc.api.request.assert_not_called()
+
+    def test_empty_and_unconfirmed_status_are_not_silent(self):
+        poc=object.__new__(RagPoc);poc.api=Mock();poc.saved={'resources':{}}
+        output=io.StringIO()
+        with contextlib.redirect_stdout(output):poc.status()
+        self.assertIn('No RAG resources',output.getvalue())
+        poc.saved['create_intents']={'schema':{'body':{'displayName':'unconfirmed'}}}
+        output=io.StringIO()
+        with contextlib.redirect_stdout(output):poc.status()
+        self.assertIn('UNCONFIRMED',output.getvalue());poc.api.request.assert_not_called()
+
+    def test_ambiguous_post_discovery_remains_fatal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            poc=object.__new__(RagPoc);poc.api=Mock();poc.saved={'resources':{},'tokens':{}}
+            poc.inventory_path=Path(tmp)/'inventory.json'
+            poc.api.items.side_effect=[[],[{'key':'one','displayName':'fixture'},{'key':'two','displayName':'fixture'}]]
+            poc.api.request.return_value=({}, {})
+            with self.assertRaisesRegex(PocError,'multiple resources'):
+                poc.create('schema','/schemas',{'displayName':'fixture'},'/schemas')
+            self.assertEqual(poc.saved['resources'],{})
+
+    def test_rag_wrapper_preserves_child_error_without_extra_traceback(self):
+        with patch.object(sys,'argv',['rag.py','status','--config','fixture.json']), \
+             patch('subprocess.run',side_effect=subprocess.CalledProcessError(7,['child'])):
+            with self.assertRaises(SystemExit) as error:
+                runpy.run_path(str(HERE/'rag.py'),run_name='__main__')
+            self.assertEqual(error.exception.code,7)
 
     def test_cli_correlation_metadata_and_opt_in_trace(self):
         with tempfile.TemporaryDirectory() as tmp:

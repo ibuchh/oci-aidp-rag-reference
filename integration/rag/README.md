@@ -61,7 +61,7 @@ python3 integration/rag/rag.py prepare --apply
 python3 integration/rag/rag.py upload-documents --apply
 ```
 
-If prepare reports a pending asynchronous operation, wait for it to finish in AIDP and rerun the same command. The inventory reconciles the accepted creation.
+If prepare reports a pending-discovery message, retain the inventory and run `python3 integration/rag/rag.py status`. Status shows the recorded operation and its current state even before the schema/volume key is discoverable. After readiness, rerun the same prepare command to reconcile the accepted creation and continue with the next resource. It does not submit a duplicate create for an accepted pending request. Wait until both schema and volume are ACTIVE before uploading documents. Failed/canceled operations, changed intents and ambiguous matches remain errors.
 
 For a deliberately new supported deployment, `rag_poc.py prepare --apply` creates the schema/volume with an ownership inventory and retry tokens. `rag.py upload-documents --apply` uploads the bundled TXT files, records hashes and selects the OCI CLI Python/SDK if the initial interpreter lacks OCI. Use `--documents-dir` explicitly for later approved TXT/PDF/DOCX documents. Name collisions without ownership are rejected. A timed-out create must be reconciled against its persisted intent rather than blindly adopted or recreated.
 

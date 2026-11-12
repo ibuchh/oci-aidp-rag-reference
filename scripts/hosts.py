@@ -181,6 +181,23 @@ class Access:
         return result.stdout if capture else None
 
 
+def wait_gpu_bootstrap(host, lab, context, timeout):
+    try:
+        host.ssh('sudo cloud-init status --wait --long', timeout=timeout)
+    except subprocess.CalledProcessError:
+        from gpu_bootstrap import program
+        try:
+            result=host.ssh('sudo python3 -',data=program(ROOT,'verify',lab.config,context),capture=True,timeout=30)
+            if json.loads(result).get('status') != 'REPAIRED':
+                raise ValueError('GPU repair verification did not pass.')
+        except (subprocess.CalledProcessError, ValueError):
+            raise PocError('GPU cloud-init failed without verified recovery. For the APT-lock failure, run '
+                           'python3 scripts/node.py repair-bootstrap --config YOUR_CONFIG --apply, then resume deploy. '
+                           'Other bootstrap errors require diagnosis; infrastructure was retained.') from None
+        print('GPU bootstrap recovery verified against this instance, source, model mount and live service health. '
+              'Original cloud-init failure records were retained.',flush=True)
+
+
 def configure_hosts(lab):
     context = {s: lab.output(s) for s in STACKS}
     if lab.config['grafana_hostname']:
@@ -195,7 +212,7 @@ def configure_hosts(lab):
         monitor = stack.enter_context(Access(lab, context, 'monitoring', known_hosts))
         timeout = lab.config['bootstrap_timeout_seconds']
         print('Waiting for GPU cloud-init/model download and CPU cloud-init. This can take many minutes.', flush=True)
-        gpu.ssh('sudo cloud-init status --wait --long', timeout=timeout)
+        wait_gpu_bootstrap(gpu,lab,context,timeout)
         monitor.ssh('sudo cloud-init status --wait --long', timeout=timeout)
         revision = shlex.quote(lab.config['model_revision'])
         gpu.ssh('sudo systemctl cat vllm | grep -F -- '+revision+' >/dev/null')

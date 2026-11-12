@@ -65,7 +65,8 @@ if args.stage in ('gpu', 'all'):
     upload(2222, '/opt/vllm-monitoring', [
         (name, root/'runtime/monitoring'/name) for name in
         ['gpu-compose.yml', 'dcgm-counters.csv', 'install-gpu.sh', 'host-health.py']
-    ] + [('pin-monitoring-images.py', root/'scripts/pin-monitoring-images.py')])
+    ] + [('pin-monitoring-images.py', root/'scripts/pin-monitoring-images.py'),
+         ('apt-retry.py', root/'terraform/vllm/apt-retry.py.tftpl')])
     ssh(2222, 'sudo bash /opt/vllm-monitoring/install-gpu.sh')
 
 if args.stage in ('monitoring', 'all'):
@@ -77,7 +78,8 @@ if args.stage in ('monitoring', 'all'):
         ['compose.yml', 'prometheus.yml', 'grafana', 'inference-probe.py',
          'install-monitoring.sh', 'validate-monitoring.py',
          'inference-load.py', 'summarize-load.py']
-    ] + [('pin-monitoring-images.py', root/'scripts/pin-monitoring-images.py')])
+    ] + [('pin-monitoring-images.py', root/'scripts/pin-monitoring-images.py'),
+         ('apt-retry.py', root/'terraform/vllm/apt-retry.py.tftpl')])
     certificate = ssh(2222, 'sudo cat /etc/nginx/tls/server.crt', capture=True).stdout
     ssh(2223, 'sudo install -d -m 700 /etc/monitoring')
     ssh(2223, 'sudo sh -c "umask 077; cat > /etc/monitoring/gpu.crt"', certificate)

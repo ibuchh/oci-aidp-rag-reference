@@ -4,8 +4,8 @@ test "$(id -u)" = 0
 test -n "${GRAFANA_HOST:?Set the public DNS hostname}"
 cd /opt/monitoring
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq
-apt-get install -y -qq docker.io docker-compose-v2 docker-buildx curl
+python3 /opt/monitoring/apt-retry.py update -qq
+python3 /opt/monitoring/apt-retry.py install -y -qq docker.io docker-compose-v2 docker-buildx curl
 systemctl enable --now docker
 device=/dev/oracleoci/oraclevdb
 test -b "$device"

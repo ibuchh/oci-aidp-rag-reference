@@ -13,13 +13,19 @@ from poc import read_config, target_check
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action',choices=['gpu-health','monitoring-health','chat','tool-test','load'])
+    parser.add_argument('action',choices=['gpu-health','monitoring-health','chat','tool-test','load','repair-bootstrap'])
     parser.add_argument('--config',type=Path,default=ROOT/'poc-config.json')
+    parser.add_argument('--apply',action='store_true',help='Apply only an explicit GPU bootstrap repair')
     parser.add_argument('--max-requests',type=int,default=100)
     args=parser.parse_args()
+    if args.apply and args.action!='repair-bootstrap':parser.error('--apply is only valid for repair-bootstrap')
     if not 1<=args.max_requests<=1000:parser.error('Use 1–1000 requests.')
     os.umask(0o077)
     cfg=read_config(args.config);target_check(cfg)
+    if args.action=='repair-bootstrap':
+        from gpu_bootstrap import launch
+        launch(cfg,apply=args.apply)
+        return
     lab,context,known=host_context(cfg)
     role='monitoring' if args.action in ('load','monitoring-health') else 'vllm'
     with Access(lab,context,role,known) as host:

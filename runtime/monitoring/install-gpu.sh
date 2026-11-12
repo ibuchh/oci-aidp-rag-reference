@@ -4,7 +4,7 @@ test "$(id -u)" = 0
 cd /opt/vllm-monitoring
 systemctl is-active --quiet nvidia-dcgm
 if ! docker compose version >/dev/null 2>&1; then
-  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq docker-compose-v2
+  python3 /opt/vllm-monitoring/apt-retry.py install -y -qq docker-compose-v2
 fi
 install -d -m 700 /var/backups/vllm-monitoring
 if [ ! -f /var/backups/vllm-monitoring/firewall.sh ]; then

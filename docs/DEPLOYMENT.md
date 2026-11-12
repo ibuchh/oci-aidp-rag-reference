@@ -109,6 +109,41 @@ Baseline serving is pinned Qwen3-8B with vLLM 0.11.0, FP16, tensor parallelism 2
 
 The bootstrap acknowledgment is required by the current controller. If private Lakehouse/AIDP initialization fails, retain successful state and inspect the real work request; do not expose the database publicly or create duplicate paid resources as a retry.
 
+#### 5a. Recover an existing GPU after the first-boot APT-lock failure
+
+If cloud-init reports `Could not get APT lock` followed by a dependent `scripts_user`/`runcmd` failure, retain the existing GPU and deployment records. Oracle Cloud Agent or another package process may still own APT's locks. Future GPU bootstraps install their required packages through a bounded lock-wait helper; the monitoring installers use the same helper. Each APT invocation waits up to 15 minutes for lock contention without stopping package processes or removing lock files.
+
+Inspect the existing GPU through verified Bastion SSH:
+
+```bash
+python3 scripts/node.py repair-bootstrap \
+  --config "$CONFIG"
+```
+
+Expected: `eligible_for_apt_lock_recovery: true` only for the known package-lock failure and its dependent runcmd failure. If earlier cloud-init stages or unrelated modules failed, diagnose those errors separately.
+
+Apply recovery explicitly:
+
+```bash
+python3 scripts/node.py repair-bootstrap \
+  --config "$CONFIG" \
+  --apply
+```
+
+The helper preserves the original bootstrap, installs the corrected script on that same GPU, waits for package locks, completes bootstrap and checks required packages, the exact model mount/revision, Docker/nginx/vLLM services and private model health. A successful repair records `REPAIRED` in a private root-owned file on the VM. Existing inference credentials and TLS files are preserved. The original cloud-init failure history remains available; the deployment controller accepts recovery only after matching this instance/source and repeating live health checks. Repeating an already verified repair performs verification instead of restarting bootstrap.
+
+After `REPAIRED`, resume from the same folder and configuration:
+
+```bash
+./deploy.sh \
+  --config "$CONFIG" \
+  --apply \
+  --through aidp \
+  --ack-aidp-bootstrap-limit
+```
+
+Expected: the existing GPU is reused and normal deployment validation continues. If the lock wait or health verification fails, keep the VM and inspect the reported failure. Do not clear cloud-init state or change Terraform ownership records to bypass it.
+
 ### 6. Validate the baseline and AIDP readiness
 
 ```bash

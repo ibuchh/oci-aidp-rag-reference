@@ -33,6 +33,7 @@ resource "oci_core_instance" "gpu" {
     ssh_authorized_keys = file(pathexpand(var.ssh_public_key_path))
     }, var.boot_volume_id != null ? {} : {
     user_data = base64encode(templatefile("${path.module}/cloud-init.yaml.tftpl", {
+      apt_retry_script     = file("${path.module}/apt-retry.py.tftpl")
       mount_ip             = data.terraform_remote_state.shared.outputs.fss_mount_ip
       model_revision       = var.model_revision
       vllm_image           = var.vllm_image

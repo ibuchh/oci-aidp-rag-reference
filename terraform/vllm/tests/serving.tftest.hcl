@@ -21,6 +21,11 @@ variables {
 run "private_gpu_bootstrap_uses_actual_network_and_imdsv2" {
   command = plan
   assert {
+    condition     = strcontains(base64decode(oci_core_instance.gpu.metadata["user_data"]), "package_update: false") && strcontains(base64decode(oci_core_instance.gpu.metadata["user_data"]), "/usr/local/sbin/poc-apt install -y docker.io nfs-common nginx openssl curl gnupg") && strcontains(base64decode(oci_core_instance.gpu.metadata["user_data"]), "DPkg::Lock::Timeout=30")
+    error_message = "GPU bootstrap must install packages through the bounded lock-wait helper."
+  }
+
+  assert {
     condition     = !oci_core_instance.gpu.create_vnic_details[0].assign_public_ip && oci_core_instance.gpu.instance_options[0].are_legacy_imds_endpoints_disabled
     error_message = "The GPU must remain private and enforce tenancy IMDSv2 governance."
   }

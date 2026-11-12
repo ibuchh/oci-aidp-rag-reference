@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+"""Wait for package locks without removing locks or stopping package processes."""
+import argparse
+import errno
+import fcntl
+import os
+from pathlib import Path
+import subprocess
+import sys
+import time
+
+LOCKS = ('/var/lib/dpkg/lock-frontend', '/var/lib/dpkg/lock',
+         '/var/lib/apt/lists/lock', '/var/cache/apt/archives/lock')
+
+
+def locked(paths=LOCKS):
+    for name in paths:
+        try:
+            with open(name, 'r+') as stream:
+                try:
+                    fcntl.lockf(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except OSError as error:
+                    if error.errno in (errno.EACCES, errno.EAGAIN):
+                        return True
+                    raise
+        except FileNotFoundError:
+            continue
+    return False
+
+
+def apt(arguments, timeout=900, *, busy=locked, run=subprocess.run,
+        clock=time.monotonic, sleep=time.sleep):
+    if not arguments or arguments[0] not in ('update', 'install'):
+        raise ValueError('Only package update/install are supported.')
+    deadline, last = clock()+timeout, None
+    environment = dict(os.environ, DEBIAN_FRONTEND='noninteractive', LC_ALL='C')
+    while True:
+        if not busy():
+            result = run(['apt-get', '-o', 'DPkg::Lock::Timeout=30',
+                          '-o', 'Acquire::Retries=3', '-o', 'Acquire::http::Timeout=30',
+                          '-o', 'Acquire::https::Timeout=30', *arguments],
+                         env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            if result.stdout:
+                print(result.stdout, end='', flush=True)
+            if result.returncode == 0:
+                return
+            # apt update has a separate lists lock, unaffected by dpkg timeout.
+            message = (result.stdout or '').lower()
+            if not busy() and not any(s in message for s in (
+                    'could not get lock', 'unable to acquire', 'unable to lock')):
+                raise RuntimeError('APT failed with exit '+str(result.returncode)+'; inspect package output above.')
+        now = clock()
+        if now >= deadline:
+            raise TimeoutError('APT lock did not clear within '+str(timeout)+' seconds. Existing package processes were left running.')
+        if last is None or now-last >= 30:
+            print('Waiting for another package operation to release APT locks...', flush=True)
+            last = now
+        sleep(min(5, deadline-now))
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--wait-seconds', type=int, default=900)
+    parser.add_argument('arguments', nargs=argparse.REMAINDER)
+    args = parser.parse_args()
+    if not 1 <= args.wait_seconds <= 1800:
+        parser.error('Use 1–1800 wait seconds.')
+    try:
+        apt(args.arguments, args.wait_seconds)
+    except (OSError, RuntimeError, ValueError) as error:
+        raise SystemExit(str(error)) from None

@@ -421,5 +421,33 @@
       "The full destructive infrastructure sequence remains an operator-run acceptance check."
     ],
     "cloud_mutations_executed_by_assistant": false
+  },
+  "apt_lock_bootstrap_recovery": {
+    "verified_utc": "2026-11-12T03:00:01.492106+00:00",
+    "status": "PASS",
+    "controller_tests_passed": 153,
+    "cause": "Oracle Cloud Agent apt update held package locks beyond cloud-init package-module timeout; dependent GPU bootstrap lacked required packages.",
+    "change": "Install first-boot GPU packages through a bounded lock-aware helper, reuse it for monitoring installers, and provide explicit repair-bootstrap inspect/apply actions for the existing GPU. Preserve cloud-init history and accept repair only with matching instance, bootstrap checksum, image/model, exact FSS mount, package/service state and live model health.",
+    "checks": [
+      "Full local validate.py passed, including Terraform validation/mock tests.",
+      "Final controller suite passed 153 tests after follow-up changes.",
+      "Final vLLM Terraform mock test passed and asserts bounded package installation.",
+      "Terraform-rendered YAML parses and exactly matches the local repair renderer/helper; embedded Bash and Python syntax validated.",
+      "Real local fcntl lock contention preserves the owner and lock contents.",
+      "Lock timeouts, update-lock races, unrelated package failures, non-APT cloud-init failures, health failures, repair identity checks and idempotent repeated repair covered.",
+      "Read-only diagnostic command verified on the existing GPU; package process had completed.",
+      "Future handover build matches corrected source and guide."
+    ],
+    "live_read_only_summary": {
+      "eligible_for_known_apt_lock_repair": true,
+      "apt_processes_remaining_at_check": 0,
+      "nvidia_driver_command_present": true,
+      "docker_and_nginx_not_installed": true
+    },
+    "limitations": [
+      "The assistant did not run repair --apply, install packages, restart services, replace the instance or change cloud-init history.",
+      "Existing-VM repair and resumed full deployment require operator-run live acceptance."
+    ],
+    "cloud_mutations_executed_by_assistant": "Temporary verified Bastion sessions only; no workload mutations"
   }
 }

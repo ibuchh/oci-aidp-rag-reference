@@ -471,5 +471,25 @@
       "Applying fallback on the workload remains an explicit operator repair/retry."
     ],
     "workload_mutations_executed_by_assistant": false
+  },
+  "streamlit_nonroot_permissions": {
+    "status": "PASS",
+    "controller_tests_passed": 162,
+    "streamlit_tests_passed": 28,
+    "cause": "Streamlit runs as UID 10001, but source directories extracted under private umask can be root-only. The container crashed with PermissionError opening /app/.streamlit/config.toml; the launcher reported creation before checking readiness.",
+    "change": "Normalize read/traverse permissions on public application source inside the image before switching to the non-root user. Verify loopback health, reject crash loops and print HTTPS validation phases. Credential permissions are unchanged.",
+    "checks": [
+      "All 28 Streamlit tests and all 162 controller tests passed.",
+      "Regression fixture starts with mode 0700 directories and mode 0600 source files, applies the image permission commands and checks non-owner readability/traversability.",
+      "Readiness tests cover delayed HTTP startup, crash/restart states, bounded timeout and no false healthy message.",
+      "Live read-only Docker state/logs confirmed the PermissionError and unavailable loopback health.",
+      "Release manifests, document links, Python syntax and future handover build checked."
+    ],
+    "limitations": [
+      "The local Docker daemon is unavailable, so a local image build was not performed.",
+      "The installed VM app is unchanged; the operator must rerun public app configuration to rebuild and verify it."
+    ],
+    "workload_mutations_executed_by_assistant": false,
+    "verified_utc": "2026-11-12T12:41:30.540509+00:00"
   }
 }

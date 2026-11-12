@@ -36,6 +36,7 @@ def install(cfg):
              '-o','HostKeyAlias='+context['monitoring']['instance_id']['value'],
              '-p',str(monitor.port),'ubuntu@127.0.0.1']
         launcher.install_monitoring(ssh,context)
+        print('Configuring Streamlit HTTPS and checking authenticated public access (up to 300 seconds)…',flush=True)
         command='sudo python3 - '+shlex.quote(cfg['streamlit_username'])+' '+shlex.quote(url)
         monitor.ssh(command,data=(ROOT/'runtime/monitoring/configure-streamlit-https.py').read_bytes(),timeout=300)
         # This file deliberately contains login credentials, never command logs or stdout.
@@ -44,6 +45,7 @@ def install(cfg):
         private_json(lab.meta/'streamlit-login.json',info)
         del login,info
     deadline=time.monotonic()+300
+    print('Verifying that public Streamlit requires authentication (up to 300 seconds)…',flush=True)
     while True:
         try:
             urllib.request.urlopen(url,timeout=15)

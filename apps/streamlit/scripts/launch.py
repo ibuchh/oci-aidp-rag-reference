@@ -187,6 +187,28 @@ def package():
     return buffer.getvalue()
 
 
+def monitoring_readiness_program():
+    return '''import json,subprocess,time,urllib.request
+deadline=time.monotonic()+120
+while True:
+    result=subprocess.run(['docker','inspect','--format','{{json .State}}','vllm-streamlit-client'],
+                          capture_output=True,text=True,check=True)
+    state=json.loads(result.stdout)
+    if state.get('Status') in ('restarting','dead','exited') or state.get('OOMKilled'):
+        raise SystemExit('Streamlit container failed during startup (exit '+str(state.get('ExitCode'))+
+                         '). Inspect docker logs vllm-streamlit-client on the monitoring VM.')
+    try:
+        with urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health',timeout=5) as response:
+            if response.status==200:
+                print('Streamlit loopback health passed.',flush=True)
+                break
+    except OSError:pass
+    if time.monotonic()>=deadline:
+        raise SystemExit('Streamlit loopback health did not pass within 120 seconds. Inspect its container logs.')
+    time.sleep(2)
+'''
+
+
 def install_monitoring(ssh, context):
     host = context['vllm']['private_ip']['value']
     grafana = context['monitoring']['grafana_url']['value']
@@ -234,7 +256,10 @@ sudo docker compose up -d
 '''
     run(ssh+['bash -c '+shlex.quote(remote)],
         error_log=ROOT/'.runtime/install-monitoring-error.log')
-    print('Monitoring app started on the VM’s loopback port 8501.', flush=True)
+    print('Checking Streamlit startup on loopback port 8501 (up to 120 seconds)…', flush=True)
+    run(ssh+['sudo -n python3 -'], data=monitoring_readiness_program().encode(),
+        error_log=ROOT/'.runtime/install-monitoring-error.log')
+    print('Monitoring app healthy on the VM’s loopback port 8501.', flush=True)
 
 
 def main():

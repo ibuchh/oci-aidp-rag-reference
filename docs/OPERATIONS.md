@@ -72,10 +72,12 @@ Two 24 GiB GPUs provide distributed capacity; they do not form one automatically
 After fixing a failed app build, proxy configuration or certificate issuance prerequisite:
 
 ```bash
-python3 scripts/configure_public_apps.py
+python3 scripts/configure_public_apps.py --config poc-config.json
 ```
 
 Expected: Streamlit listens on monitoring loopback port 8501, authenticated public HTTPS returns success, and unauthenticated HTTPS returns 401. The existing generated password is preserved. Login metadata is refreshed locally with mode 0600. Diagnose the failure before rerunning repeatedly against ACME issuance limits.
+
+The installer checks loopback health before configuring public HTTPS and reports each validation phase. A container being created is not sufficient for success. If startup reports `PermissionError` for `/app/.streamlit/config.toml`, update to the current release and rerun this command. The image normalizes permissions on application files and directories before switching to its non-root runtime user, including when extraction used a private umask. The readiness check stops promptly if the container crashes or restarts; private installer diagnostics are saved in `apps/streamlit/.runtime/install-monitoring-error.log`. This repair rebuilds the Streamlit app and preserves its existing login credentials.
 
 An optional Mac client is included:
 

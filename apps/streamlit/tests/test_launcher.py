@@ -1,5 +1,7 @@
 import importlib.util
+import contextlib
 import io
+import json
 import os
 import shlex
 from pathlib import Path
@@ -49,7 +51,7 @@ class Launcher(unittest.TestCase):
         calls = []
         with mock.patch.object(launcher, 'run', side_effect=lambda argv, **kw: calls.append(argv)):
             launcher.install_monitoring(['ssh'], context)
-        remote = shlex.split(calls[-1][-1])[2]
+        remote = shlex.split(next(call[-1] for call in calls if call[-1].startswith('bash -c ')))[2]
         for present in (False, True):
             with self.subTest(plugin_present=present), tempfile.TemporaryDirectory() as folder:
                 root = Path(folder)
@@ -80,6 +82,63 @@ class Launcher(unittest.TestCase):
                 self.assertEqual((root/'apt.log').exists(), not present)
                 if not present:
                     self.assertIn('docker-buildx', (root/'apt.log').read_text())
+
+    def test_image_normalizes_restrictive_source_permissions_before_nonroot_start(self):
+        dockerfile=(ROOT/'Dockerfile').read_text()
+        normalize=dockerfile.split('RUN chmod -R ',1)[1].split('USER ',1)[0].strip()
+        command='chmod -R '+normalize.replace('\\\n','')
+        self.assertIn('USER 10001:10001',dockerfile)
+        with tempfile.TemporaryDirectory() as folder:
+            app=Path(folder)
+            for name in ('client/nested/module.py','.streamlit/config.toml','app.py','requirements.txt'):
+                p=app/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text('fixture');p.chmod(0o600)
+            for name in ('client','client/nested','.streamlit'):(app/name).chmod(0o700)
+            subprocess.run(['bash','-c',command.replace('/app/',shlex.quote(folder)+'/')],check=True)
+            for p in app.rglob('*'):
+                mode=p.stat().st_mode & 0o777
+                self.assertEqual(mode & 0o004,0o004,str(p))
+                if p.is_dir():self.assertEqual(mode & 0o001,0o001,str(p))
+                else:self.assertEqual(mode & 0o222,0,str(p))
+
+    def test_readiness_waits_for_http_health_after_container_creation(self):
+        state=subprocess.CompletedProcess([],0,json.dumps({'Status':'running','ExitCode':0}),'')
+        response=mock.MagicMock();response.__enter__.return_value.status=200
+        with mock.patch('subprocess.run',return_value=state), \
+             mock.patch('urllib.request.urlopen',side_effect=[OSError('starting'),response]) as request, \
+             mock.patch('time.sleep') as sleep,contextlib.redirect_stdout(io.StringIO()):
+            exec(launcher.monitoring_readiness_program(),{})
+        self.assertEqual(request.call_count,2);sleep.assert_called_once_with(2)
+
+    def test_readiness_fails_immediately_for_crash_loop_without_printing_container_logs(self):
+        for status in ('restarting','exited','dead'):
+            state=subprocess.CompletedProcess([],0,json.dumps({'Status':status,'ExitCode':1}),'')
+            with self.subTest(status=status),mock.patch('subprocess.run',return_value=state) as docker, \
+                 mock.patch('urllib.request.urlopen') as request:
+                with self.assertRaisesRegex(SystemExit,'failed during startup'):
+                    exec(launcher.monitoring_readiness_program(),{})
+                request.assert_not_called()
+                self.assertEqual(docker.call_args.args[0][1],'inspect')
+
+    def test_readiness_times_out_when_running_container_never_serves_health(self):
+        state=subprocess.CompletedProcess([],0,json.dumps({'Status':'running','ExitCode':0}),'')
+        with mock.patch('subprocess.run',return_value=state), \
+             mock.patch('urllib.request.urlopen',side_effect=OSError('not ready')), \
+             mock.patch('time.monotonic',side_effect=[0,121]),mock.patch('time.sleep') as sleep:
+            with self.assertRaisesRegex(SystemExit,'within 120 seconds'):
+                exec(launcher.monitoring_readiness_program(),{})
+            sleep.assert_not_called()
+
+    def test_failed_readiness_does_not_report_app_healthy(self):
+        context={'vllm':{'private_ip':{'value':'10.0.0.1'}},
+                 'monitoring':{'grafana_url':{'value':'https://grafana.example'}}}
+        def run(argv,**kw):
+            if kw.get('data')==launcher.monitoring_readiness_program().encode():
+                raise RuntimeError('private startup diagnostics')
+        output=io.StringIO()
+        with mock.patch.object(launcher,'run',side_effect=run),contextlib.redirect_stdout(output):
+            with self.assertRaisesRegex(RuntimeError,'private startup'):
+                launcher.install_monitoring(['ssh'],context)
+        self.assertNotIn('Monitoring app healthy',output.getvalue())
 
     def test_cleanup_removes_its_key_and_stops_only_owned_process(self):
         with tempfile.TemporaryDirectory() as folder:

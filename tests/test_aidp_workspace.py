@@ -42,6 +42,67 @@ class WorkspaceTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.addCleanup(lambda: [p.stop() for p in reversed(self.patches)])
 
+    def path_repair_fixture(self):
+        api=Mock();api.aidp_id='ocid1.aidataplatform.test'
+        w=module.Workspace(self.cfg,api)
+        w.saved['resources']={'workspace':{'key':'workspace'},'agent':{'key':'agent'},'compute':{'key':'compute'}}
+        w.workspace=Mock(return_value={'key':'workspace'})
+        agent={'key':'agent','type':'CODE','computeKey':'compute','pathInfo':'agents',
+               'entryFilePath':'/Workspace/Shared/source.py','dependenciesFilePath':'/Workspace/Shared/requirements.txt',
+               'deploymentState':{'PROD':'ACTIVE','TEST':'ACTIVE'}}
+        w.api.get.return_value=agent.copy();w.api.items.return_value=[]
+        w.api.request.return_value=({}, {})
+        return w,agent
+
+    def test_agent_path_preview_is_read_only(self):
+        w,_=self.path_repair_fixture();w.repair_agent_path()
+        w.api.request.assert_not_called();self.assertFalse(w.path.exists())
+
+    def test_agent_path_restores_only_missing_folder_and_preserves_metadata(self):
+        w,agent=self.path_repair_fixture()
+        def create(*args,**kwargs):
+            record=json.loads(w.path.read_text())['agent_ui_path']
+            self.assertEqual(record['status'],'REQUESTED')
+            self.assertEqual(args[3],record['token'])
+            self.assertEqual(kwargs['headers'],{'path':'/Workspace/agents','type':'FOLDER','is-overwrite':'false'})
+            self.assertTrue(kwargs['raw']);return {},{}
+        w.api.request.side_effect=create
+        w.repair_agent_path(apply=True)
+        self.assertEqual(w.api.request.call_count,1)
+        self.assertEqual(w.api.get.return_value,agent)
+        self.assertEqual(w.saved['agent_ui_path']['status'],'VERIFIED')
+        w.api.items.return_value=[{'path':'/Workspace/agents','type':'FOLDER'}]
+        w.repair_agent_path(apply=True)
+        self.assertEqual(w.api.request.call_count,1)
+
+    def test_agent_path_existing_file_is_not_overwritten(self):
+        w,_=self.path_repair_fixture()
+        w.api.items.return_value=[{'path':'/Workspace/agents','type':'FILE'}]
+        with self.assertRaisesRegex(module.PocError,'non-folder'):w.repair_agent_path(apply=True)
+        w.api.request.assert_not_called()
+
+    def test_agent_path_identity_mismatch_is_rejected(self):
+        w,_=self.path_repair_fixture();w.api.get.return_value['computeKey']='unowned'
+        with self.assertRaisesRegex(module.PocError,'identity/type/compute'):w.repair_agent_path(apply=True)
+        w.api.request.assert_not_called()
+
+    def test_agent_path_interrupted_create_reuses_recorded_token(self):
+        w,_=self.path_repair_fixture();w.api.request.side_effect=TimeoutError('interrupted')
+        for attempt in range(2):
+            with self.assertRaises(TimeoutError):w.repair_agent_path(apply=True)
+        self.assertEqual(w.api.request.call_args_list[0].args[3],w.api.request.call_args_list[1].args[3])
+        self.assertEqual(json.loads(w.path.read_text())['agent_ui_path']['status'],'REQUESTED')
+
+    def test_agent_path_changed_record_is_rejected(self):
+        w,_=self.path_repair_fixture();w.saved['agent_ui_path']={'agent_key':'unowned'}
+        with self.assertRaisesRegex(module.PocError,'another resource'):w.repair_agent_path(apply=True)
+        w.api.request.assert_not_called()
+
+    def test_agent_path_valid_absolute_path_is_only_checked(self):
+        w,_=self.path_repair_fixture();w.api.get.return_value['pathInfo']='/Workspace/Shared'
+        w.repair_agent_path(apply=True)
+        w.api.request.assert_not_called();self.assertFalse(w.path.exists())
+
     def test_api_retains_service_error_without_printing_it(self):
         (self.root/'.local').mkdir()
         response = Mock(returncode=0, stdout=json.dumps({'status':'403 Forbidden',

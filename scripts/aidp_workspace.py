@@ -183,7 +183,7 @@ class Workspace:
                 raise PocError('Agent name collision without ownership inventory.')
             agent = self.create('agent', prefix+'/agents', {
                 'displayName': name, 'description': 'Metadata-only runtime identity probe',
-                'pathInfo': 'agents', 'type': 'CODE', 'computeKey': compute['key']})
+                'pathInfo': '/Workspace/Shared', 'type': 'CODE', 'computeKey': compute['key']})
         else:
             agent = self.api.get(prefix+'/agents/'+quote(self.saved['resources']['agent']['key'], safe=''))
         # Creation supplies the actual project directory. Do not invent one or
@@ -193,6 +193,54 @@ class Workspace:
         self.save()
         print('AI Compute is ACTIVE; coded agent created. Inspect status before uploading source.')
         return True
+
+    def repair_agent_path(self, apply=False):
+        workspace = self.workspace()
+        resources = self.saved['resources']
+        prefix = '/workspaces/' + quote(workspace['key'], safe='')
+        agent_path = prefix + '/agents/' + quote(resources['agent']['key'], safe='')
+        agent = self.api.get(agent_path)
+        if (agent.get('key') != resources['agent']['key'] or agent.get('type') != 'CODE' or
+                agent.get('computeKey') != resources['compute']['key']):
+            raise PocError('Agent identity/type/compute differs from the owned baseline; no path repair attempted.')
+        if agent.get('pathInfo') != 'agents':
+            self.api.items(prefix + '/objects?' + urlencode({'path': agent['pathInfo']}))
+            print('Agent workspace path resolves; no legacy path repair needed.', flush=True)
+            return
+        canonical = '/Workspace/agents'
+        objects = prefix + '/objects'
+        matches = [item for item in self.api.items(objects + '?' + urlencode({'path':'/Workspace'}))
+                   if item.get('path') == canonical]
+        if matches:
+            if len(matches) != 1 or matches[0].get('type') != 'FOLDER':
+                raise PocError('Legacy agent path collides with a non-folder or ambiguous workspace object.')
+            self.api.items(objects + '?' + urlencode({'path':'agents'}))
+            print('Legacy agent workspace folder already resolves; no object changed.', flush=True)
+            return
+        record = self.saved.get('agent_ui_path')
+        identity = {'agent_key': agent['key'], 'workspace_key': workspace['key'], 'canonical_path':canonical}
+        if record and any(record.get(k) != value for k,value in identity.items()):
+            raise PocError('Agent path repair record belongs to another resource; inspect inventory.')
+        if not apply:
+            print('Preview: create the missing empty folder /Workspace/agents in the owned workspace. '
+                  'Agent, source, compute and deployed endpoint remain unchanged. Use --apply.', flush=True)
+            return
+        observed = {k: agent.get(k) for k in ('key','pathInfo','entryFilePath','dependenciesFilePath',
+                                            'computeKey','deploymentState')}
+        record = record or dict(identity, token=str(uuid.uuid4()), original_agent=observed)
+        record['status'] = 'REQUESTED'
+        self.saved['agent_ui_path'] = record
+        self.save()
+        self.api.request('POST', objects, '', record['token'],
+                         headers={'path':canonical, 'type':'FOLDER', 'is-overwrite':'false'}, raw=True)
+        self.api.items(objects + '?' + urlencode({'path':'agents'}))
+        current = self.api.get(agent_path)
+        if observed != {k:current.get(k) for k in observed}:
+            raise PocError('Agent metadata changed during folder repair; inspect the retained repair record.')
+        record['status'] = 'VERIFIED'
+        self.save()
+        print('Agent workspace folder restored and verified; refresh the baseline agent UI. '
+              'Agent, source, compute and deployed endpoint are unchanged.', flush=True)
 
     def status(self):
         result = {}
@@ -611,11 +659,14 @@ class Workspace:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['plan', 'apply', 'bootstrap', 'connect', 'status', 'wait-active', 'upload-probe', 'publish-probe', 'invoke-probe', 'redeploy-probe', 'prepare-credential-probe', 'configure-private-dns', 'prepare-vault-credential', 'upload-inference', 'redeploy-inference', 'invoke-inference', 'playground-status'])
+    parser.add_argument('command', choices=['plan', 'apply', 'bootstrap', 'connect', 'status', 'repair-agent-path', 'wait-active', 'upload-probe', 'publish-probe', 'invoke-probe', 'redeploy-probe', 'prepare-credential-probe', 'configure-private-dns', 'prepare-vault-credential', 'upload-inference', 'redeploy-inference', 'invoke-inference', 'playground-status'])
     parser.add_argument('--config', type=Path, default=ROOT/'poc-config.json')
+    parser.add_argument('--apply', action='store_true', help='Apply repair-agent-path; omitted previews without changes.')
     parser.add_argument('--wait-minutes', type=int, default=0,
                         help='For apply, poll every 30 seconds until ready (maximum 60 minutes).')
     args = parser.parse_args()
+    if args.apply and args.command != 'repair-agent-path':
+        parser.error('--apply is only used with repair-agent-path; other commands retain their existing behavior.')
     if not 0 <= args.wait_minutes <= 60:
         parser.error('--wait-minutes must be between 0 and 60')
     cfg = read_config(args.config)
@@ -628,6 +679,8 @@ def main():
         if args.command == 'plan':
             print(json.dumps({'workspace': workspace.workspace(), 'compute': '1 OCPU, 16 GB, one fixed replica',
                               'agent': 'CODE identity probe; no key access or IAM changes'}, indent=2))
+        elif args.command == 'repair-agent-path':
+            workspace.repair_agent_path(apply=args.apply)
         elif args.command == 'connect':
             workspace.connect(args.wait_minutes or 30)
         elif args.command in ('apply', 'bootstrap', 'configure-private-dns', 'wait-active'):

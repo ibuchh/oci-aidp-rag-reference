@@ -77,6 +77,22 @@ Expected: workspace `NAME-private` uses the foundation’s exact workspace subne
 
 Compute and agent names use underscores because the service rejects hyphens in compute names. The workspace name permits hyphens.
 
+### 4b. Restore a legacy baseline agent's missing UI folder
+
+Older packages created the baseline coded agent with the relative workspace path `agents`. If opening it reports `Error fetching workspace object: Unknown resource agents`, inspect the scoped repair:
+
+```bash
+python3 scripts/aidp_workspace.py repair-agent-path --config poc-config.json
+```
+
+Expected preview: create only the missing empty `/Workspace/agents` folder in the owned workspace. Apply after reviewing the preview:
+
+```bash
+python3 scripts/aidp_workspace.py repair-agent-path --config poc-config.json --apply
+```
+
+Expected: the legacy path resolves and the agent ID, source paths, AI Compute attachment and deployment state remain unchanged. Refresh the baseline agent in AIDP and check both Development and Playground. This restores workspace navigation; it does not republish the endpoint or move source files. The helper records its folder-creation intent and retry token in the existing inventory, refuses file collisions and never overwrites an existing object. Current releases use the existing absolute `/Workspace/Shared` path for new baseline agents. Native RAG schema/volume creation is a separate operation.
+
 ### 5. Prepare Credential Store references and run the probe
 
 ```bash

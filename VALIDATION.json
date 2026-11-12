@@ -512,5 +512,28 @@
     ],
     "workload_mutations_executed_by_assistant": false,
     "verified_utc": "2026-11-12T14:51:32.337796+00:00"
+  },
+  "agent_ui_path_repair": {
+    "status": "PASS",
+    "controller_tests_passed": 169,
+    "cause": "The legacy baseline agent pathInfo was agents, but /Workspace/agents did not exist. AIDP UI failed while resolving that project path although deployed agent/compute were active.",
+    "change": "New baseline agents use the existing absolute /Workspace/Shared path. Add a preview-first repair-agent-path command that restores only a missing legacy folder, records ownership/retry token, refuses file collisions, and checks unchanged agent/source/compute/deployment metadata.",
+    "checks": [
+      "All 169 controller tests passed.",
+      "Repair preview writes no inventory and sends no POST.",
+      "Missing-folder repair, idempotency, token reuse after interruption, ownership/compute mismatch, file collisions and already valid paths covered.",
+      "Live read-only requests reproduced Unknown resource agents and verified relative Shared resolves to /Workspace/Shared.",
+      "Scoped live repair created /Workspace/agents, verified relative agents listing and preserved all original inventory fields.",
+      "Browser reload verified no workspace-object error, enabled Development controls, and Playground showing existing chat and ACTIVE compute.",
+      "Release manifests, Python syntax, document links and future handover build checked."
+    ],
+    "limitations": [
+      "Legacy repair restores navigation only: the new folder is empty and deployed source stays in its original Shared folder. No source migration or endpoint republish was performed.",
+      "Browser verification loaded existing Playground session; no new chat acceptance request was sent."
+    ],
+    "workload_mutations_executed_by_assistant": [
+      "Created the missing empty /Workspace/agents folder in the explicitly owned workspace and saved the private local repair journal. No active workload was restarted or replaced."
+    ],
+    "verified_utc": "2026-11-12T15:18:02.045397+00:00"
   }
 }

@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 """Wait for package locks without removing locks or stopping package processes."""
 import argparse
+from datetime import datetime, timezone
 import errno
 import fcntl
 import os
+import re
+import shutil
+import tempfile
+import urllib.request
+from urllib.parse import urlsplit
 from pathlib import Path
 import subprocess
 import sys
@@ -28,27 +34,104 @@ def locked(paths=LOCKS):
     return False
 
 
+CLOUD_MIRROR = re.compile(r'https?://[a-z0-9.-]+\.clouds\.archive\.ubuntu\.com/ubuntu(?=[/\s]|$)', re.I)
+ARCHIVE = 'https://archive.ubuntu.com/ubuntu'
+
+
+def use_ubuntu_archive(output, *, apt_root=Path('/etc/apt'), backup_root=Path('/var/backups/poc-apt'),
+                       opener=urllib.request.urlopen):
+    failed = [line for line in output.splitlines()
+              if 'failed to fetch' in line.lower() or line.startswith('Err:')]
+    failed_hosts = {urlsplit(match[0]).hostname for line in failed for match in CLOUD_MIRROR.finditer(line)}
+    if not failed_hosts:
+        return False
+    paths = [apt_root/'sources.list', *sorted((apt_root/'sources.list.d').glob('*.list')),
+             *sorted((apt_root/'sources.list.d').glob('*.sources'))]
+    changes = []
+    for path in paths:
+        if path.is_symlink() or not path.is_file():
+            continue
+        original = path.read_text()
+        replacement = CLOUD_MIRROR.sub(
+            lambda match: ARCHIVE if urlsplit(match[0]).hostname in failed_hosts else match[0], original)
+        if replacement != original:
+            changes.append((path, replacement, path.stat()))
+    if not changes:
+        return False
+    try:
+        with opener(ARCHIVE+'/dists/'+ubuntu_suite(apt_root, failed_hosts)+'/InRelease', timeout=12) as response:
+            if response.status != 200:
+                return False
+            response.read(1)
+    except OSError:
+        return False
+    backup = backup_root/datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ')
+    backup.mkdir(parents=True,mode=0o700)
+    for path, replacement, info in changes:
+        saved = backup/path.relative_to(apt_root)
+        saved.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
+        shutil.copy2(path,saved);saved.chmod(0o600)
+    for path, replacement, info in changes:
+        with tempfile.NamedTemporaryFile(dir=path.parent,prefix='.'+path.name+'.',delete=False) as stream:
+            temporary=Path(stream.name)
+            stream.write(replacement.encode())
+        try:
+            temporary.chmod(info.st_mode & 0o777)
+            if os.geteuid() == 0:
+                os.chown(temporary,info.st_uid,info.st_gid)
+            os.replace(temporary,path)
+        finally:
+            temporary.unlink(missing_ok=True)
+    print('Ubuntu cloud mirror failed; using the official HTTPS archive. Original source configuration: '+str(backup),flush=True)
+    return True
+
+
+def ubuntu_suite(apt_root, hosts=None):
+    # The suite is read from the matching Ubuntu entries, not caller-provided URLs.
+    for path in [apt_root/'sources.list', *sorted((apt_root/'sources.list.d').glob('*.list'))]:
+        if not path.is_file() or path.is_symlink():continue
+        for line in path.read_text().splitlines():
+            match=re.search(CLOUD_MIRROR.pattern+r'/?\s+([a-z][a-z0-9-]*)',line,re.I)
+            if match and (hosts is None or urlsplit(CLOUD_MIRROR.search(line)[0]).hostname in hosts):
+                return match[1].split('-',1)[0]
+    for path in sorted((apt_root/'sources.list.d').glob('*.sources')):
+        if path.is_symlink():continue
+        text=path.read_text()
+        if any(hosts is None or urlsplit(match[0]).hostname in hosts for match in CLOUD_MIRROR.finditer(text)):
+            match=re.search(r'^Suites:\s*([a-z][a-z0-9-]*)',text,re.M)
+            if match:return match[1].split('-',1)[0]
+    raise ValueError('Cannot establish the Ubuntu suite for mirror fallback.')
+
+
 def apt(arguments, timeout=900, *, busy=locked, run=subprocess.run,
-        clock=time.monotonic, sleep=time.sleep):
+        clock=time.monotonic, sleep=time.sleep, fallback=use_ubuntu_archive):
     if not arguments or arguments[0] not in ('update', 'install'):
         raise ValueError('Only package update/install are supported.')
     deadline, last = clock()+timeout, None
+    mirror_changed = False
     environment = dict(os.environ, DEBIAN_FRONTEND='noninteractive', LC_ALL='C')
     while True:
         if not busy():
-            result = run(['apt-get', '-o', 'DPkg::Lock::Timeout=30',
+            result = run(['apt-get', '-o', 'DPkg::Lock::Timeout=30', '-o', 'APT::Update::Error-Mode=any',
                           '-o', 'Acquire::Retries=3', '-o', 'Acquire::http::Timeout=30',
                           '-o', 'Acquire::https::Timeout=30', *arguments],
                          env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
             if result.stdout:
                 print(result.stdout, end='', flush=True)
-            if result.returncode == 0:
+            partial_update = arguments[0] == 'update' and 'failed to fetch' in (result.stdout or '').lower()
+            if result.returncode == 0 and not partial_update:
                 return
+            if not mirror_changed and fallback(result.stdout or ''):
+                mirror_changed = True
+                if arguments[0] == 'install':
+                    remaining = max(1, int(deadline-clock()))
+                    apt(['update'], remaining, busy=busy, run=run, clock=clock, sleep=sleep, fallback=lambda output:False)
+                continue
             # apt update has a separate lists lock, unaffected by dpkg timeout.
             message = (result.stdout or '').lower()
             if not busy() and not any(s in message for s in (
                     'could not get lock', 'unable to acquire', 'unable to lock')):
-                raise RuntimeError('APT failed with exit '+str(result.returncode)+'; inspect package output above.')
+                raise RuntimeError('APT failed or repository refresh was incomplete (exit '+str(result.returncode)+'); inspect package output above.')
         now = clock()
         if now >= deadline:
             raise TimeoutError('APT lock did not clear within '+str(timeout)+' seconds. Existing package processes were left running.')

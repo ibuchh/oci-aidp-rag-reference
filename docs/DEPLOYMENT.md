@@ -111,7 +111,7 @@ The bootstrap acknowledgment is required by the current controller. If private L
 
 #### 5a. Recover an existing GPU after the first-boot APT-lock failure
 
-If cloud-init reports `Could not get APT lock` followed by a dependent `scripts_user`/`runcmd` failure, retain the existing GPU and deployment records. Oracle Cloud Agent or another package process may still own APT's locks. Future GPU bootstraps install their required packages through a bounded lock-wait helper; the monitoring installers use the same helper. Each APT invocation waits up to 15 minutes for lock contention without stopping package processes or removing lock files.
+If cloud-init reports `Could not get APT lock` followed by a dependent `scripts_user`/`runcmd` failure, retain the existing GPU and deployment records. Oracle Cloud Agent or another package process may still own APT's locks. Future GPU bootstraps install their required packages through a bounded lock-wait helper; the monitoring installers use the same helper. Each APT invocation waits up to 15 minutes for lock contention without stopping package processes or removing lock files. If an Ubuntu cloud mirror fails, the helper checks the official HTTPS Ubuntu archive, backs up the affected APT source files under `/var/backups/poc-apt/`, and changes only the failed Ubuntu cloud-mirror URLs. NVIDIA/CUDA repositories, security repository URLs and signature/keyring settings are preserved. Repository updates must complete successfully; an incomplete refresh is not accepted merely because APT returned exit zero.
 
 Inspect the existing GPU through verified Bastion SSH:
 

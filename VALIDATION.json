@@ -449,5 +449,27 @@
       "Existing-VM repair and resumed full deployment require operator-run live acceptance."
     ],
     "cloud_mutations_executed_by_assistant": "Temporary verified Bastion sessions only; no workload mutations"
+  },
+  "apt_mirror_fallback": {
+    "verified_utc": "2026-11-12T03:25:52.340043+00:00",
+    "status": "PASS",
+    "controller_tests_passed": 162,
+    "cause": "The configured Ubuntu cloud mirror returned 503/timeouts; apt update can return success while retaining stale repository indices.",
+    "change": "Require a complete repository refresh. On a failed Ubuntu cloud-mirror host, probe the official HTTPS archive, back up affected .list/.sources files and change only that failed host. Refresh indices before retrying installation. Preserve custom mirrors, NVIDIA/CUDA/security URLs and package keyring/signature settings.",
+    "checks": [
+      "Incomplete update with exit zero does not pass.",
+      "Install failures refresh metadata before retrying after fallback.",
+      "Only failed Ubuntu cloud hosts are rewritten; source backups and modes are checked.",
+      "Deb822 and legacy sources, unavailable fallback, unrelated repository errors, custom mirrors and one-fallback limit covered.",
+      "All 162 controller tests and the vLLM Terraform mock test passed.",
+      "Terraform-rendered YAML and embedded helper match exactly.",
+      "Live GET probe from the GPU found the configured mirror timing out and archive.ubuntu.com returning HTTP 200.",
+      "Future handover build matches corrected source and guide."
+    ],
+    "limitations": [
+      "The active repair continues using the helper it started with. The assistant did not interrupt APT or change VM source files.",
+      "Applying fallback on the workload remains an explicit operator repair/retry."
+    ],
+    "workload_mutations_executed_by_assistant": false
   }
 }

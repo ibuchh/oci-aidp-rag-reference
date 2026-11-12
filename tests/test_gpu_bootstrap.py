@@ -78,6 +78,76 @@ class BootstrapTests(unittest.TestCase):
         finally:
             if child.poll() is None:child.terminate();child.communicate(timeout=5)
 
+    def test_incomplete_update_does_not_succeed_just_because_apt_exits_zero(self):
+        bad='W: Failed to fetch http://iad-ad-1.clouds.archive.ubuntu.com/ubuntu/dists/jammy/InRelease 503 Service Unavailable'
+        run=mock.Mock(side_effect=[SimpleNamespace(returncode=0,stdout=bad),SimpleNamespace(returncode=0,stdout='updated')])
+        fallback=mock.Mock(return_value=True)
+        apt.apt(['update'],busy=lambda:False,run=run,fallback=fallback)
+        self.assertEqual(run.call_count,2);fallback.assert_called_once_with(bad)
+        self.assertIn('APT::Update::Error-Mode=any',run.call_args.args[0])
+
+    def test_install_mirror_failure_refreshes_indices_before_retrying_install(self):
+        bad='E: Failed to fetch http://iad-ad-1.clouds.archive.ubuntu.com/ubuntu/pool/docker.deb 503 Service Unavailable'
+        run=mock.Mock(side_effect=[SimpleNamespace(returncode=100,stdout=bad),SimpleNamespace(returncode=0,stdout='updated'),SimpleNamespace(returncode=0,stdout='installed')])
+        apt.apt(['install','docker.io'],busy=lambda:False,run=run,fallback=mock.Mock(return_value=True))
+        commands=[next(a for a in c.args[0] if a in ('update','install')) for c in run.call_args_list]
+        self.assertEqual(commands,['install','update','install'])
+
+    def test_cloud_mirror_fallback_backs_up_sources_and_preserves_other_repositories(self):
+        sources=self.root/'apt';(sources/'sources.list.d').mkdir(parents=True)
+        original='deb http://iad-ad-1.clouds.archive.ubuntu.com/ubuntu jammy main\ndeb http://security.ubuntu.com/ubuntu jammy-security main\n'
+        source=sources/'sources.list';source.write_text(original);source.chmod(0o644)
+        third=sources/'sources.list.d/nvidia.list';third.write_text('deb [signed-by=/keys/nvidia.gpg] https://nvidia.github.io/libnvidia-container/stable/deb/amd64 /\n')
+        deb822=sources/'sources.list.d/ubuntu.sources';deb822.write_text('Types: deb\nURIs: http://iad-ad-1.clouds.archive.ubuntu.com/ubuntu\nSuites: jammy-updates\nComponents: main\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n')
+        before_third=third.read_bytes();opener=mock.MagicMock();opener.return_value.__enter__.return_value.status=200
+        backup=self.root/'backups';bad='W: Failed to fetch http://iad-ad-1.clouds.archive.ubuntu.com/ubuntu/dists/jammy/InRelease 503'
+        self.assertTrue(apt.use_ubuntu_archive(bad,apt_root=sources,backup_root=backup,opener=opener))
+        self.assertIn('https://archive.ubuntu.com/ubuntu jammy main',source.read_text())
+        self.assertIn('http://security.ubuntu.com/ubuntu',source.read_text());self.assertEqual(third.read_bytes(),before_third)
+        self.assertIn('Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg',deb822.read_text())
+        self.assertEqual(source.stat().st_mode & 0o777,0o644)
+        saved=next(backup.glob('*/sources.list'));self.assertEqual(saved.read_text(),original)
+        self.assertEqual(saved.stat().st_mode & 0o777,0o600)
+
+    def test_deb822_only_sources_supply_the_correct_ubuntu_suite(self):
+        sources=self.root/'apt';(sources/'sources.list.d').mkdir(parents=True)
+        (sources/'sources.list.d/ubuntu.sources').write_text('URIs: http://iad-ad-1.clouds.archive.ubuntu.com/ubuntu\nSuites: noble noble-updates\n')
+        self.assertEqual(apt.ubuntu_suite(sources),'noble')
+
+    def test_third_party_failure_never_switches_the_ubuntu_mirror(self):
+        opener=mock.Mock()
+        bad='Hit: http://iad-ad-1.clouds.archive.ubuntu.com/ubuntu jammy\nW: Failed to fetch https://nvidia.github.io/Packages 503'
+        self.assertFalse(apt.use_ubuntu_archive(bad,apt_root=self.root,backup_root=self.root/'backups',opener=opener))
+        opener.assert_not_called();self.assertFalse((self.root/'backups').exists())
+
+    def test_unreachable_archive_does_not_modify_the_configured_mirror(self):
+        sources=self.root/'apt';sources.mkdir();source=sources/'sources.list'
+        original='deb http://iad-ad-1.clouds.archive.ubuntu.com/ubuntu jammy main\n';source.write_text(original)
+        bad='W: Failed to fetch http://iad-ad-1.clouds.archive.ubuntu.com/ubuntu/dists/jammy/InRelease 503'
+        self.assertFalse(apt.use_ubuntu_archive(bad,apt_root=sources,backup_root=self.root/'backups',opener=mock.Mock(side_effect=OSError('unreachable'))))
+        self.assertEqual(source.read_text(),original);self.assertFalse((self.root/'backups').exists())
+
+    def test_custom_mirrors_are_not_rewritten(self):
+        sources=self.root/'apt';sources.mkdir();source=sources/'sources.list';source.write_text('deb https://mirror.example.test/ubuntu jammy main\n')
+        opener=mock.Mock();bad='W: Failed to fetch http://iad-ad-1.clouds.archive.ubuntu.com/ubuntu/dists/jammy/InRelease 503'
+        self.assertFalse(apt.use_ubuntu_archive(bad,apt_root=sources,backup_root=self.root/'backups',opener=opener))
+        opener.assert_not_called();self.assertIn('mirror.example.test',source.read_text())
+
+    def test_fallback_changes_only_the_cloud_host_that_actually_failed(self):
+        sources=self.root/'apt';sources.mkdir();source=sources/'sources.list'
+        source.write_text('deb http://iad-ad-1.clouds.archive.ubuntu.com/ubuntu jammy main\ndeb http://iad-ad-2.clouds.archive.ubuntu.com/ubuntu jammy-updates main\n')
+        opener=mock.MagicMock();opener.return_value.__enter__.return_value.status=200
+        bad='W: Failed to fetch http://iad-ad-1.clouds.archive.ubuntu.com/ubuntu/dists/jammy/InRelease 503'
+        self.assertTrue(apt.use_ubuntu_archive(bad,apt_root=sources,backup_root=self.root/'backups',opener=opener))
+        self.assertIn('https://archive.ubuntu.com/ubuntu jammy main',source.read_text())
+        self.assertIn('http://iad-ad-2.clouds.archive.ubuntu.com/ubuntu jammy-updates main',source.read_text())
+
+    def test_persistent_repository_failure_stops_after_one_fallback(self):
+        bad='W: Failed to fetch http://iad-ad-1.clouds.archive.ubuntu.com/ubuntu/dists/jammy/InRelease 503'
+        fallback=mock.Mock(return_value=True);run=mock.Mock(return_value=SimpleNamespace(returncode=100,stdout=bad))
+        with self.assertRaises(RuntimeError):apt.apt(['update'],busy=lambda:False,run=run,fallback=fallback)
+        self.assertEqual(run.call_count,2);self.assertEqual(fallback.call_count,1)
+
     def test_only_the_known_apt_lock_and_dependent_runcmd_failure_are_eligible(self):
         self.assertTrue(gpu.eligible(self.errors))
         self.assertFalse(gpu.eligible([]))

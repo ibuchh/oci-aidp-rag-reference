@@ -218,6 +218,8 @@ Expected: three successful uploads, or `Already recorded uploaded` for unchanged
 
 ### 11. Create the native knowledge base and ingest the volume
 
+**Repeat this step after destroying and redeploying AIDP.** The KB and its ingested index belong to that AIDP instance; a successful ingestion from a deleted instance does not carry over to the new deployment. Uploading the sample documents in step 10 prepares the source volume but does not create or ingest the KB.
+
 In AIDP, navigate to **Master catalog → default → POC_PREFIX_rag**. Use **Add to schema → Knowledge base** or the Knowledge Bases create control. Create `aster_knowledge_base` with:
 
 - Embedding model `ALL_MINILM_L12_V2`.
@@ -225,6 +227,8 @@ In AIDP, navigate to **Master catalog → default → POC_PREFIX_rag**. Use **Ad
 - The existing ingestion Spark cluster, or leave the optional cluster unset to use Default Master Catalog Compute. AI Compute runs the agent; it is separate from ingestion Spark compute.
 
 Wait for the KB to be Active. Open it → **Data Source** → the plus button. Select the whole volume `/Volumes/default/POC_PREFIX_rag/synthetic_documents`, enable **TEXT**, keep **Start ingestion job on add** selected, and add the source. Select the volume source → **Job runs** and wait for **Succeeded**, with **3 files added, 0 modified and 0 deleted** on the initial empty-volume run. Save the job ID and completion time.
+
+Before continuing, confirm that the new instance shows **default → POC_PREFIX_rag → Knowledge Bases → aster_knowledge_base** and the successful ingestion job for this source volume. Complete this check before publishing the RAG agent or running acceptance.
 
 Substitute the actual `POC_PREFIX`; the UI does not expand shell variables. The packaged public-API helper does not create or ingest native KBs. These are explicit UI steps. See [Oracle knowledge-base procedures](https://docs.oracle.com/en/cloud/paas/ai-data-platform/aidug/knowledge-bases.html).
 
@@ -241,7 +245,7 @@ python3 integration/rag/rag.py connect \
   --apply
 ```
 
-`record-kb` records the default KB identity; it does not create the KB or prove retrieval. `connect` renders account-specific source under `deployments/NAME/rag/`, uploads it to the separate `POC_PREFIX_rag_agent`, publishes its endpoint, waits for ACTIVE and runs all five acceptance cases. Generated source contains public trust and credential identifiers; the inference key and vector-store credentials remain in the runtime.
+`record-kb` only records the default KB identity locally. It does not create the KB, start ingestion, check that the KB exists or prove retrieval. A saved identity is therefore insufficient to proceed without the Active KB and Succeeded ingestion checks in step 11. `connect` renders account-specific source under `deployments/NAME/rag/`, uploads it to the separate `POC_PREFIX_rag_agent`, publishes its endpoint, waits for ACTIVE and runs all five acceptance cases. Generated source contains public trust and credential identifiers; the inference key and vector-store credentials remain in the runtime.
 
 If the endpoint wait times out while the service is still creating it, inspect the same owned deployment and resume readiness/validation without publishing another version:
 
@@ -253,6 +257,8 @@ python3 integration/rag/rag.py verify \
 ```
 
 Expected: `RAG acceptance: PASS` in `deployments/NAME/rag/rag-acceptance.json`. Retrieval uses native AIDP helpers and Lakehouse vectors, followed by private vLLM generation. Revalidate the runtime adapter after AIDP upgrades. Do not republish for ordinary questions or document-only updates.
+
+An ACTIVE endpoint confirms deployment readiness. RAG acceptance additionally requires the KB in the configured instance/catalog/schema, completed ingestion and all five passing cases. If the trace reports a KB lookup HTTP 404, check that exact KB location and complete step 11 before rerunning `verify`.
 
 The published RAG agent follows this sequence:
 

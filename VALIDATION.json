@@ -535,5 +535,18 @@
       "Created the missing empty /Workspace/agents folder in the explicitly owned workspace and saved the private local repair journal. No active workload was restarted or replaced."
     ],
     "verified_utc": "2026-11-12T15:18:02.045397+00:00"
+  },
+  "rag_redeploy_documentation": {
+    "status": "PASS",
+    "scope": "Documentation only; runtime and Terraform code unchanged.",
+    "change": "Clarify that native KB creation and ingestion must be repeated after AIDP destroy/redeploy; document that sample file uploads and record-kb do not create/ingest/validate the KB; require exact current-instance KB identity and completed ingestion before publication/acceptance. Explain the ACTIVE endpoint gate and KB lookup 404 recovery.",
+    "checks": [
+      "All deployment-guide Bash blocks passed bash -n.",
+      "Customer-document links and public release content scan passed.",
+      "Future handover build emits the same revised guide.",
+      "Release manifests and ZIP integrity verified."
+    ],
+    "cloud_mutations_executed": false,
+    "verified_utc": "2026-11-12T15:41:11.538481+00:00"
   }
 }
